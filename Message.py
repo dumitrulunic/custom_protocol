@@ -5,6 +5,12 @@ class Message:
         self.sequence = sequence
         self.user = user
         self.payload = payload
+        self.operations = {
+            1:"ERR",
+            2:"SYN",
+            3:"ACK",
+            4:"FIN",            
+        }
         
     def to_bytes(self) -> bytes:
         pass

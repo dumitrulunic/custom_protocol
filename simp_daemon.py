@@ -2,9 +2,10 @@ import socket
 from Message import Message
 
 class Daemon:
-    def __init__(self, ip:str, port:int = 7777):
+    def __init__(self, ip:str, daemon_port:int = 7777, client_port:int = 7778):
         self.ip = ip
-        self.port = port
+        self.daemon_port = daemon_port
+        self.client_port = client_port
         self.connections = {}
         
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
