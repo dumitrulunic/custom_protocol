@@ -1,13 +1,5 @@
-## SIMP: Simple IMC Messaging Protocol
+## Progress Overview
 
-### Project Overview
-A lightweight chat protocol built on UDP with reliable messaging using stop-and-wait and a three-way handshake.
-
-### Authors:
-- [Andrei-Flavius Văcaru](https://github.com/VakaruGIT)
-- [Dumitru Lunic](https://github.com/dumitrulunic)
-
-### Progress Overview
 #### Core Components
 - **Daemon** (`simp_daemon.py`):
   - [x] Define basic structure.
@@ -39,19 +31,3 @@ A lightweight chat protocol built on UDP with reliable messaging using stop-and-
     - Correct implementation of stop-and-wait: 10 points.
     - Correct implementation of the communication between daemon and client: 10 points.
     - Clean code and clear documentation: 5 points.
-
-### Running the Project
-1. Install dependencies:
-    ```
-    pip install -r requirements.txt
-    ```
-
-2. Start the daemon:
-    ```
-    python simp_daemon.py 
-    ```
-
-3. Start the client:
-    ```
-    python simp_client.py
-    ```
