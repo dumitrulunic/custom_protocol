@@ -5,11 +5,11 @@ from typing import List, Tuple
 class Daemon:
     def __init__(self, daemon_ip:str, daemon_port:int = 7777, client_port:int = 7778):
         self.daemon_ip = daemon_ip
-        self.demon_port = daemon_port
+        self.daemon_port = daemon_port
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.client_port = client_port
         self.active_chat = None
-        self.udp_socket.bind((self.ip, self.port))
+        self.process = True # This is a flag to stop the daemon
         self.operations = {
             0x01: {
                 0x01: "ERR",
@@ -21,13 +21,30 @@ class Daemon:
                 0x01: "CHAT"
             }
         }
-        print(f"Daemon init at {self.ip}:{self.port}")
+        print(f"Daemon init at {self.daemon_ip}:{self.daemon_port}")
         
     def start(self) -> None:
         """Must start the daemon"""
         print("Daemon started")
-        pass
-    
+        try:
+            # Binding the UDP socket to specified IP and port
+            self.udp_socket.bind((self.daemon_ip,self.daemon_port))
+            while self.process: # Daemon is active 
+                try:
+                    # Listen for data from incoming datagrams (UDP packets)
+                    data, addr = self.udp_socket.recvfrom(1024)
+                    # Parse datagram
+                    datagram = Datagram(data)
+                    # Handle datagram
+                    self.handle_request(addr, datagram)
+                except socket.error as e:
+                    # Socket was closed, break out the loop
+                    break
+                print(f"Error handling datagram: {e}")
+        except Exception as e:
+            print(f"Error starting daemon: {e}")
+        finally:
+            self.udp_socket.close()
     
     # another daemon -> daemon
     def handle_request(self, sender_address:Tuple[int, int], datagram:Datagram) -> None:
@@ -67,5 +84,10 @@ class Daemon:
     
     def end(self):
         """Must end the daemon session(daemon must be active non stop and listen for requests)"""
-        pass
+        self.process = False
+        try:
+            self.udp_socket.close()
+            print("Daemon stopped")
+        except Exception as e:
+            print(f"Error closing socket: {e}")
         
