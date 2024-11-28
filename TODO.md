@@ -4,7 +4,7 @@
 - **Daemon** (`simp_daemon.py`):
   - [x] Define basic structure.
   - [x] Placeholders for all methods.
-  - [ ] Implement `start` and `end` methods.
+  - [x] Implement `start` and `end` methods.
   - [ ] Implement `three_way_handshake`.
   - [ ] Implement `stop_and_wait`.
   - [ ] Handle `send_datagram` and `receive_datagram`.
