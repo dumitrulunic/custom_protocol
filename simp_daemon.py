@@ -65,17 +65,36 @@ class Daemon:
     # daemon -> another daemon
     def send_datagram(self, datagram:Datagram, receiver_address: Tuple[int, int]) -> None:
         """Must send the datagram, input is datagram and tuple of address (port and ip)"""
-        pass
+        # Convert datagram to bytes
+        datagram_bytes = datagram.to_bytes()
+        # Send datagram to receiver
+        self.udp_socket.sendto(datagram_bytes, receiver_address)
     
     # another daemon -> daemon
     def receive_datagram(self) -> Tuple[Datagram, Tuple[int, int]]:
         """Must receive the datagram in form of tuple of Datagram and sender address(tuple of port and ip)"""
-        pass
+        data, sender_address = self.udp_socket.recvfrom(1024)
+        datagram = Datagram.from_bytes(data)
+        return datagram, sender_address
     
     # daemon -> another daemon
     def three_way_handshake(self, sender_address:Tuple[int, int], sender_username: str) -> bool:
         """Must establish a connection, input is the sender address with port and the usernamea as tuple and also second input is the username"""
-        pass
+        # We send the SYN
+        syn_datagram = Datagram(type= 0x01, operation=0x02, sequence=0, user=sender_username, payload="", length=0)
+        # Send the SYN datagram
+        self.send_datagram(syn_datagram, sender_address)
+
+        # We wait for SYN-ACK
+        try:
+            datagram, _ = self.receive_datagram() # Ignore the sender address
+            if datagram.operation == 0x04: # SYN-ACK
+                ack_datagram = Datagram(type=0x01, operation=0x04, sequence=0, user=sender_username, payload="", length=0)
+                self.send_datagram(ack_datagram, sender_address)
+                return True
+        except Exception as e:
+            print(f"Error receiving SYN-ACK: {e}")          
+        return False
     
     # daemon -> another daemon
     def stop_and_wait(self, datagram:Datagram, receiver_address:Tuple[int, int]) -> None | Datagram:
