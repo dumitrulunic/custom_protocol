@@ -58,6 +58,7 @@ class Daemon:
             print(f"Error in client connection: {e}")
         finally:
             self.client_tcp_socket.close()
+            print("Stopped listening for clients.")
 
     def handle_client(self, client_conn, client_addr):
         """Handle communication with a connected client."""
@@ -121,6 +122,7 @@ class Daemon:
             print(f"Error in UDP listener: {e}")
         finally:
             self.daemon_udp_socket.close()
+            print("Stopped listening for daemons.")
 
     def start(self):
         try:
@@ -139,9 +141,13 @@ class Daemon:
         finally:
             self.daemon_udp_socket.close()
             self.client_tcp_socket.close()
+            print("Daemon stopped.")
 
     def end(self):
         self.process = False
+        self.daemon_udp_socket.close()
+        self.client_tcp_socket.close()
+        print("Daemon stopped.")
         
         
 ####################HANDLING DAEMONS######################
