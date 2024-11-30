@@ -5,7 +5,7 @@
   - [x] Define basic structure.
   - [x] Placeholders for all methods.
   - [x] Implement `start` and `end` methods.
-  - [x] Implement `three_way_handshake`.
+  - [ ] Implement `three_way_handshake`.
   - [ ] Implement `stop_and_wait`.
   - [ ] Handle `send_datagram` and `receive_datagram`.
   - [ ] Process incoming chat invitations and manage active chat status.
@@ -18,7 +18,7 @@
 
 - **Datagram**:
   - [x] Define datagram format and fields.
-  - [x] Implement `to_bytes` and `from_bytes` for serialization/deserialization.
+  - [ ] Implement `to_bytes` and `from_bytes` for serialization/deserialization.
 
 #### Supporting Functionality
 - [x] Define utility functions for data conversion.
