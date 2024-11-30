@@ -21,6 +21,7 @@ class Daemon:
         self.daemon_ip = daemon_ip
         self.daemon_port = daemon_port
         self.daemon_udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.daemon_udp_socket.settimeout(5)
         self.connected_to_client = False
         self.client_tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connected_to_daemon = False
@@ -42,6 +43,8 @@ class Daemon:
         }
         print(f"Daemon init at {self.daemon_ip}:{self.daemon_port}")
 
+    
+    ###################HANDLING CLIENTS#########################
     def connect_and_listen_client(self):
         try:
             self.client_tcp_socket.bind((self.daemon_ip, self.client_port))
@@ -139,3 +142,94 @@ class Daemon:
 
     def end(self):
         self.process = False
+        
+        
+####################HANDLING DAEMONS######################
+    # daemon -> daemon
+    def three_way_handshake_init(self, other_daemon_address: Tuple[str, int], retries: int = 3) -> bool:
+        for attempt in range(retries):
+            try:
+                print(f"Attempt {attempt + 1}: Starting 3-way handshake with {other_daemon_address}")
+                
+                # Send SYN
+                syn_datagram = Datagram(type=0x01, operation=0x02, sequence=0, user="daemon1", payload="", length=0)
+                self.send_datagram(self.daemon_udp_socket, syn_datagram, other_daemon_address)
+                print(f"SYN sent to {other_daemon_address}")
+                
+                # Wait for SYN+ACK
+                response = self.receive_datagram(self.daemon_udp_socket)
+                if response is None:
+                    print("Timeout waiting for SYN+ACK. Retrying...")
+                    continue
+
+                datagram, address = response
+                if datagram.operation == (0x02 | 0x04):  # SYN+ACK
+                    print(f"Received SYN+ACK from {address}")
+                    
+                    # Send ACK
+                    ack_datagram = Datagram(type=0x01, operation=0x04, sequence=1, user="daemon1", payload="", length=0)
+                    self.send_datagram(self.daemon_udp_socket, ack_datagram, other_daemon_address)
+                    print(f"ACK sent to {other_daemon_address}")
+                    print(f"3-way handshake completed with {other_daemon_address}")
+                    return True
+                else:
+                    print(f"Unexpected response from {address}: {datagram}")
+            except Exception as e:
+                print(f"Error in 3-way handshake attempt {attempt + 1}: {e}")
+        
+        print("Failed to complete 3-way handshake after retries.")
+        return False
+
+    def three_way_handshake_receive(self) -> bool:
+        
+        try:
+            print("Waiting for SYN...")
+            datagram, address = self.receive_datagram(self.daemon_udp_socket)
+            if datagram and datagram.operation == 0x02:  # SYN
+                print(f"Received SYN from {address}")
+                
+                # Send SYN+ACK
+                ack_syn_operation = 0x02 | 0x04
+                syn_ack_datagram = Datagram(type=0x01, operation=ack_syn_operation, sequence=0, user="Daemon2", payload="", length=0)
+                self.send_datagram(self.daemon_udp_socket, syn_ack_datagram, address)
+                print(f"SYN+ACK sent to {address}")
+                
+                # Wait for ACK
+                ack_response = self.receive_datagram(self.daemon_udp_socket)
+                if ack_response is None:
+                    print("Timeout waiting for ACK.")
+                    return False
+                
+                ack_datagram, ack_address = ack_response
+                if ack_datagram.operation == 0x04:  # ACK
+                    print(f"Received ACK from {ack_address}")
+                    print(f"3-way handshake completed with {ack_address}")
+                    return True
+                else:
+                    print(f"Unexpected response from {ack_address}: {ack_datagram}")
+            else:
+                print(f"Unexpected datagram received: {datagram}")
+        except Exception as e:
+            print(f"Error in 3-way handshake receive: {e}")
+        return False
+
+    
+    # daemon -> daemon
+    def receive_datagram(self, socket: socket.socket) -> Tuple[Datagram, Tuple[str, int]]:
+        try:
+            data, adress = socket.recvfrom(1024)
+            datagram_received = Datagram.from_bytes(data)
+            print(f"RECEIVED: {datagram_received} from {adress}")
+            return datagram_received, adress
+        except Exception as e:
+            print(f"Error sending datagram: {e}")
+        except socket.timeout:
+            print("Datagram receive timed out.")
+            return None
+            
+    def send_datagram(self, socket: socket.socket, datagram: Datagram, target_address: Tuple[str, int]):
+        try:
+            socket.sendto(datagram.to_bytes(), target_address)
+            print(f"SENT: {datagram} to {target_address}")
+        except Exception as e:
+            print(f"Error sending datagram: {e}")

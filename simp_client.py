@@ -77,15 +77,15 @@ class Client:
         print("Waiting for chat requests...")
         while True:
             response = self.daemon_tcp_socket.recv(1024).decode("utf-8")
-            if response.startswith("4"):  # "chat_request_pending"
+            if response.startswith("4"):
                 pending_user = response.split()[1]
                 print(f"Chat request pending from {pending_user}.")
                 choice = input("Do you want to accept the chat request? (y/n): ").strip().lower()
                 if choice == "y":
-                    self.daemon_tcp_socket.sendall(f"5 {pending_user}".encode("utf-8"))  # "chat_accept"
+                    self.daemon_tcp_socket.sendall(f"5 {pending_user}".encode("utf-8"))
                     self.run_chat_session()
                 else:
-                    self.daemon_tcp_socket.sendall(f"6 {pending_user}".encode("utf-8"))  # "chat_reject"
+                    self.daemon_tcp_socket.sendall(f"6 {pending_user}".encode("utf-8"))
 
     def initiate_chat(self):
         target_ip = input("Enter the IP address of the user to chat with: ").strip()
@@ -115,7 +115,7 @@ class Client:
             print("Disconnected from daemon.")
 
     def quit(self):
-        self.daemon_tcp_socket.sendall("10".encode("utf-8"))  # "quit"
+        self.daemon_tcp_socket.sendall("10".encode("utf-8"))
         self.daemon_tcp_socket.close()
         print("Disconnected from the daemon. Goodbye!")
         sys.exit(0)

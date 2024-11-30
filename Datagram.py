@@ -3,7 +3,7 @@ class Datagram:
         self.type = type
         self.operation = operation
         self.sequence = sequence
-        self.user = user.ljust(32, '\x00')[:32]  # Ensure user is 32 bytes
+        self.user = user.ljust(32, '\x00')[:32]
         self.payload = payload
         self.length = length
         self.operations = {
