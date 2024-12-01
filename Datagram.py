@@ -11,6 +11,7 @@ class Datagram:
                 0x01: "ERR",
                 0x02: "SYN",
                 0x04: "ACK",
+                0x06: "SYN+ACK",
                 0x08: "FIN",
             },
             0x02: {
@@ -26,6 +27,7 @@ class Datagram:
         user_bytes = self.user.encode("ascii").ljust(32, b'\x00')  # Ensure user is 32 bytes
         length_bytes = self.length.to_bytes(4, "little")
         payload_bytes = self.payload.encode("ascii")
+        
 
         # Concatenate all byte fields
         return type_bytes + operation_bytes + sequence_bytes + user_bytes + length_bytes + payload_bytes
@@ -38,14 +40,15 @@ class Datagram:
         user = data[3:35].decode("ascii").strip('\x00')
         length = int.from_bytes(data[35:39], "little")
         payload = data[39:].decode("ascii")
-
+        
         # Return a new instance of Datagram
         return Datagram(type, operation, sequence, user, payload, length)
 
     def __str__(self) -> str:
-        return f"{self.operations[self.type][self.operation]} {self.user} {self.payload}"
+        operation_name = self.get_operation_name()
+        return f"{operation_name} {self.user} {self.payload}"
 
     def get_operation_name(self) -> str:
         if self.type in self.operations and self.operation in self.operations[self.type]:
             return self.operations[self.type][self.operation]
-        return "UNKNOWN"
+        return f"UNKNOWN_OPERATION({self.operation})"
