@@ -2,6 +2,7 @@ import socket
 from Datagram import Datagram
 from typing import List, Tuple
 import threading
+import time
 
 class Daemon:
     MESSAGE_CODES = {
@@ -29,6 +30,7 @@ class Daemon:
         self.active_chat = None
         self.pending_chat_request = None
         self.process = True  # This is a flag to stop the daemon
+        self.shutdown = False
         self.timeout = 5
         self.operations = {
             0x01: {
@@ -51,14 +53,19 @@ class Daemon:
             self.client_tcp_socket.listen(1)
             print(f"Listening for clients on {self.daemon_ip}:{self.client_port}")
             while self.process:
-                client_conn, client_addr = self.client_tcp_socket.accept()
-                print(f"Client connected: {client_addr}")
-                self.handle_client(client_conn, client_addr)
+                try:
+                    client_conn, client_addr = self.client_tcp_socket.accept()
+                    print(f"Client connected: {client_addr}")
+                    self.handle_client(client_conn, client_addr)
+                except Exception as e:
+                    if self.process:
+                        print(f"Error accepting client connection: {e}")
         except Exception as e:
-            print(f"Error in client connection: {e}")
+            print(f"Error in client listener: {e}")
         finally:
             self.client_tcp_socket.close()
-            print("Stopped listening for clients.")
+            print(f"Stopped listening for clients on {self.daemon_ip}:{self.client_port}.")
+
 
     def handle_client(self, client_conn, client_addr):
         """Handle communication with a connected client."""
@@ -113,41 +120,72 @@ class Daemon:
             while self.process:
                 try:
                     data, addr = self.daemon_udp_socket.recvfrom(1024)
-                    print(f"Message received from daemon {addr}: {data.decode('utf-8')}")
+                    deserialized_datagram = Datagram.from_bytes(data)
+                    print(f"Message received from daemon {addr}: {deserialized_datagram}")
+
+                    # Handle SYN and respond with ACK
+                    if deserialized_datagram.operation == 0x02:  # SYN
+                        print(f"Received SYN from {addr}. Sending ACK...")
+                        ack_datagram = Datagram(
+                            type=0x01,
+                            operation=0x04,
+                            sequence=deserialized_datagram.sequence + 1,
+                            user="daemon2",
+                            payload="",
+                            length=0
+                        )
+                        self.send_datagram(self.daemon_udp_socket, ack_datagram, addr)
+                        print(f"Sent ACK to {addr}: {ack_datagram}")
+
                 except socket.timeout:
-                    pass
+                    print("Timeout waiting for datagram.")
                 except Exception as e:
                     print(f"Error receiving datagram: {e}")
         except Exception as e:
-            print(f"Error in UDP listener: {e}")
+            print(f"Error in daemon listener: {e}")
         finally:
             self.daemon_udp_socket.close()
             print("Stopped listening for daemons.")
-
     def start(self):
+        self.client_thread = threading.Thread(target=self.connect_and_listen_client, daemon=False)
+        self.daemon_thread = threading.Thread(target=self.connect_and_listen_daemon, daemon=False)
+
+        self.client_thread.start()
+        self.daemon_thread.start()
+
+        print("Daemon is running...")
         try:
-            client_thread = threading.Thread(target=self.connect_and_listen_client, daemon=True)
-            daemon_thread = threading.Thread(target=self.connect_and_listen_daemon, daemon=True)
-
-            client_thread.start()
-            daemon_thread.start()
-
-            print("Daemon is running...")
             while self.process:
-                pass
+                time.sleep(1)
         except KeyboardInterrupt:
             print("\nDaemon shutting down...")
-            self.process = False
         finally:
-            self.daemon_udp_socket.close()
-            self.client_tcp_socket.close()
-            print("Daemon stopped.")
+            self.end()
 
     def end(self):
+        if self.shutdown:
+            print(f"Daemon at {self.daemon_ip}:{self.daemon_port} already shut down.")
+            return
+
+        self.shutdown = True
         self.process = False
-        self.daemon_udp_socket.close()
-        self.client_tcp_socket.close()
-        print("Daemon stopped.")
+
+        try:
+            self.daemon_udp_socket.close()
+            self.client_tcp_socket.close()
+            print(f"Sockets closed for {self.daemon_ip}:{self.daemon_port}.")
+        except Exception as e:
+            print(f"Error closing sockets: {e}")
+
+        try:
+            if hasattr(self, "client_thread"):
+                self.client_thread.join(timeout=2)
+            if hasattr(self, "daemon_thread"):
+                self.daemon_thread.join(timeout=2)
+            print(f"Threads joined for {self.daemon_ip}:{self.daemon_port}.")
+        except Exception as e:
+            print(f"Error joining threads: {e}")
+        print(f"Daemon at {self.daemon_ip}:{self.daemon_port} stopped.")
         
         
 ####################HANDLING DAEMONS######################
@@ -223,15 +261,17 @@ class Daemon:
     # daemon -> daemon
     def receive_datagram(self, socket: socket.socket) -> Tuple[Datagram, Tuple[str, int]]:
         try:
-            data, adress = socket.recvfrom(1024)
+            data, address = socket.recvfrom(1024)
             datagram_received = Datagram.from_bytes(data)
-            print(f"RECEIVED: {datagram_received} from {adress}")
-            return datagram_received, adress
-        except Exception as e:
-            print(f"Error sending datagram: {e}")
+            print(f"RECEIVED: {datagram_received} from {address}")
+            return datagram_received, address
         except socket.timeout:
             print("Datagram receive timed out.")
-            return None
+            return None, None  # Explicitly return a tuple with None values
+        except Exception as e:
+            print(f"Error receiving datagram: {e}")
+            raise  # Raise the error to let the caller decide how to handle it
+
             
     def send_datagram(self, socket: socket.socket, datagram: Datagram, target_address: Tuple[str, int]):
         try:
@@ -239,3 +279,24 @@ class Daemon:
             print(f"SENT: {datagram} to {target_address}")
         except Exception as e:
             print(f"Error sending datagram: {e}")
+            
+    def stop_and_wait(self, datagram: Datagram, receiver_address: Tuple[str, int]) -> bool:
+        try:
+            for attempt in range(3):  # Retry 3 times if needed
+                self.send_datagram(self.daemon_udp_socket, datagram, receiver_address)
+                print(f"Datagram sent to {receiver_address}. Waiting for ACK...")
+
+                response, addr = self.receive_datagram(self.daemon_udp_socket)
+                if response is None:
+                    print(f"Attempt {attempt + 1}: Timeout waiting for ACK. Retrying...")
+                    continue
+
+                if response.operation == 0x04:  # ACK
+                    print(f"Received ACK from {addr}: {response}")
+                    return True  # Successful stop-and-wait
+
+            print("Failed to receive ACK after 3 attempts.")
+            return False
+        except Exception as e:
+            print(f"Error in stop-and-wait: {e}")
+            return False
