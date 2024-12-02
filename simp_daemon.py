@@ -188,25 +188,36 @@ class Daemon:
             print(f"Daemon at {self.daemon_ip}:{self.daemon_port} already shut down.")
             return
 
+        # Mark shutdown state
         self.shutdown = True
         self.process = False
+        print(f"Initiating shutdown for daemon at {self.daemon_ip}:{self.daemon_port}...")
 
+        # Join threads before closing sockets
         try:
-            self.daemon_udp_socket.close()
-            self.client_tcp_socket.close()
-            print(f"Sockets closed for {self.daemon_ip}:{self.daemon_port}.")
-        except Exception as e:
-            print(f"Error closing sockets: {e}")
-
-        try:
-            if hasattr(self, "client_thread"):
+            if hasattr(self, "client_thread") and self.client_thread.is_alive():
                 self.client_thread.join(timeout=2)
-            if hasattr(self, "daemon_thread"):
+                print(f"Client thread joined for {self.daemon_ip}:{self.daemon_port}.")
+            if hasattr(self, "daemon_thread") and self.daemon_thread.is_alive():
                 self.daemon_thread.join(timeout=2)
-            print(f"Threads joined for {self.daemon_ip}:{self.daemon_port}.")
+                print(f"Daemon thread joined for {self.daemon_ip}:{self.daemon_port}.")
         except Exception as e:
-            print(f"Error joining threads: {e}")
-        print(f"Daemon at {self.daemon_ip}:{self.daemon_port} stopped.")
+            print(f"Error joining threads for {self.daemon_ip}:{self.daemon_port}: {e}")
+
+        # Close sockets
+        try:
+            if hasattr(self, "daemon_udp_socket") and self.daemon_udp_socket:
+                self.daemon_udp_socket.close()
+                print(f"UDP socket closed for {self.daemon_ip}:{self.daemon_port}.")
+            if hasattr(self, "client_tcp_socket") and self.client_tcp_socket:
+                self.client_tcp_socket.close()
+                print(f"TCP socket closed for {self.daemon_ip}:{self.daemon_port}.")
+        except Exception as e:
+            print(f"Error closing sockets for {self.daemon_ip}:{self.daemon_port}: {e}")
+
+        # Final log
+        print(f"Daemon at {self.daemon_ip}:{self.daemon_port} successfully stopped.")
+
         
         
 ####################HANDLING DAEMONS######################
