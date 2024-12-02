@@ -1,10 +1,11 @@
 import socket
 import threading
 from Datagram import Datagram
+from logger import logger
 
 class Daemon:
-    def __init__(self, ip:str) -> None:
-        self.port = 7777
+    def __init__(self, ip:str, port:int = 7777) -> None:
+        self.port = port
         self.ip_address = ip
         self.running = True
         
@@ -13,7 +14,7 @@ class Daemon:
         self.socket.bind((self.ip_address, self.port))
         self.socket.settimeout(5)
         
-        # Daemon - Daemon connections
+        # Daemon - Daemon connections, by ip and port
         self.active_connections = {}
         
         self.lock = threading.Lock()
@@ -28,7 +29,7 @@ class Daemon:
         try:
             datagram = Datagram.from_bytes(datagram)
         except ValueError:
-            print("Invalid datagram received")
+            logger.error(f"Invalid datagram from {address}")
             return
         
         if datagram.type == b'\x01':  # Control Datagram

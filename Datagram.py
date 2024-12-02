@@ -1,4 +1,5 @@
 import struct
+from logger import logger
 
 class Datagram:
     def __init__(self, type:bytes, operation:bytes, sequence:bytes, user:bytes, length:bytes, payload:bytes) -> None:
@@ -20,35 +21,35 @@ class Datagram:
             "ACK": b'\x04',
             "FIN": b'\x08',
         }
-    
+        
     def check_datagram(self):
         
         if self.type not in (0x01, 0x02):
-            print(f"[Datagram Check] Invalid type: {self.type}")
+            logger.error(f"Invalid type: {self.type}")
             return False
 
         if self.type == 0x01:  # control datagram
             if self.operation not in (0x01, 0x02, 0x04, 0x08):
-                print(f"[Datagram Check] Invalid operation for control datagram: {self.operation}")
+                logger.error(f"Invalid operation for control datagram: {self.operation}")
                 return False
             
         elif self.type == 0x02:  # chat datagram
             if self.operation != 0x01:
-                print(f"[Datagram Check] Invalid operation for chat datagram: {self.operation}")
+                logger.error(f"Invalid operation for chat datagram: {self.operation}")
                 return False
             
         if self.sequence not in range(0, 1):
-            print(f"[Datagram Check] Invalid sequence: {self.sequence}")
+            logger.error(f"Invalid sequence: {self.sequence}")
             return False
         
         if self.length != len(self.payload):
-            print(f"[Datagram Check] Invalid length, must be length of paylaod: {self.length}")
+            logger.error(f"Invalid length, must be length of paylaod: {self.length}")
             return False
 
         try:
             self.user.decode('ascii')
         except UnicodeDecodeError:
-            print(f"[Datagram Check] Invalid user, cannot decode 'ascii': {self.user}")
+            logger.error(f"Invalid user, cannot decode 'ascii': {self.user}")
             return False
         
         return True
@@ -56,6 +57,7 @@ class Datagram:
 
     def to_bytes(self):
         if not self.check_datagram():
+            logger.error("Invalid datagram")
             raise ValueError("Invalid datagram")
         user_fixed = self.user.ljust(32, b'\x00')[:32]
          
@@ -67,6 +69,7 @@ class Datagram:
         user_fixed,
         int.from_bytes(self.length, 'big')
     )
+        logger.info(f"Datagram created: {header} {self.payload}")
         return header + self.payload
     
     def from_bytes(data:bytes):
@@ -79,4 +82,5 @@ class Datagram:
         length = data[35:39]
         payload = data[39:]
         
+        logger.info(f"Datagram parsed: {type} {operation} {sequence} {user} {length} {payload}")
         return Datagram(type, operation, sequence, user, length, payload)
