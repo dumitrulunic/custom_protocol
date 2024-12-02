@@ -5,7 +5,7 @@ class Datagram:
         self.type = type
         self.operation = operation
         self.sequence = sequence
-        self.user = user
+        self.user = user.ljust(32)[:32] # fixed 32 bytes length
         self.length = length
         self.payload = payload
         
@@ -22,49 +22,37 @@ class Datagram:
         }
     
     def check_datagram(self):
-        if len(self.type) != 1:
-            print("Type is not 1 byte long")
+        
+        if self.type not in (0x01, 0x02):
+            print(f"[Datagram Check] Invalid type: {self.type}")
             return False
-        if len(self.operation) != 1:
-            print("Operation is not 1 byte long")
-            return False
-        if len(self.sequence) != 1:
-            print("Sequence is not 1 byte long")
-            return False
-        if len(self.user) != 32:
-            print("User is not 32 bytes long")
-            return False
-        if len(self.length) != 4:
-            print("Length is not 4 bytes long")
+
+        if self.type == 0x01:  # control datagram
+            if self.operation not in (0x01, 0x02, 0x04, 0x08):
+                print(f"[Datagram Check] Invalid operation for control datagram: {self.operation}")
+                return False
+            
+        elif self.type == 0x02:  # chat datagram
+            if self.operation != 0x01:
+                print(f"[Datagram Check] Invalid operation for chat datagram: {self.operation}")
+                return False
+            
+        if self.sequence not in range(0, 1):
+            print(f"[Datagram Check] Invalid sequence: {self.sequence}")
             return False
         
-        if self.type == b"\x01":
-            if self.operation not in [b"\x01", b"\x02", b"\x04", b"\x08", b"\x06"]:
-                print("Invalid operation")
-                return False
-        elif self.type == b"\x02":
-            if self.operation != b"\x02":
-                print("Invalid operation")
-                return False
-
-        if self.type == b"\x01" and self.operation == b"\x01":
-            try:
-                self.payload.decode('ascii')
-            except UnicodeDecodeError:
-                print("Payload is not a valid ASCII string for error message")
-                return False
-        if self.type == b"\x02":
-            try:
-                self.payload.decode('ascii')
-            except UnicodeDecodeError:
-                print("Payload is not a valid ASCII string for chat message")
-                return False
-            
-        if int.from_bytes(self.length, 'big') != len(self.payload):
-            print("Length field does not match payload size")
+        if self.length != len(self.payload):
+            print(f"[Datagram Check] Invalid length, must be length of paylaod: {self.length}")
             return False
-            
+
+        try:
+            self.user.decode('ascii')
+        except UnicodeDecodeError:
+            print(f"[Datagram Check] Invalid user, cannot decode 'ascii': {self.user}")
+            return False
+        
         return True
+
 
     def to_bytes(self):
         if not self.check_datagram():
