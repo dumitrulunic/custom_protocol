@@ -8,7 +8,7 @@ def main():
     client = Client(daemon_ip)
     print(f"Connecting to Daemon on {client.daemon_ip}:{client.daemon_port}...")
     try:
-        client.connect_to_daemon()
+        client.run()
     except KeyboardInterrupt:
         print("\nClient interrupted. Exiting...")
     except Exception as e:

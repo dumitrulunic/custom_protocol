@@ -112,6 +112,95 @@ class Daemon:
         finally:
             client_conn.close()
             print(f"Connection with client {client_addr} closed.")
+            
+    def handle_chat_request_from_client(self, client_conn, client_addr, target_ip, target_port):
+        try:
+            print(f"Client requested chat with daemon at {target_ip}:{target_port}...")
+
+            # Create chat request datagram
+            chat_request_datagram = Datagram(
+                type=0x01,
+                operation=0x03,  # Chat request
+                sequence=0,
+                user=self.daemon_ip,
+                payload=f"{self.daemon_ip}:{self.daemon_port}",
+                length=len(f"{self.daemon_ip}:{self.daemon_port}")
+            )
+            self.daemon_udp_socket.sendto(chat_request_datagram.to_bytes(), (target_ip, target_port))
+            print(f"Chat request sent to daemon at {target_ip}:{target_port}.")
+
+            # Wait for a response
+            response, addr = self.daemon_udp_socket.recvfrom(1024)
+            response_datagram = Datagram.from_bytes(response)
+
+            if response_datagram.operation == 0x07:  # Chat accepted
+                print(f"Chat accepted by daemon at {addr}. Notifying client.")
+                client_conn.sendall("7".encode("utf-8"))  # Notify client
+            elif response_datagram.operation == 0x08:  # Chat rejected
+                print(f"Chat rejected by daemon at {addr}. Notifying client.")
+                client_conn.sendall("8".encode("utf-8"))  # Notify client
+            else:
+                print(f"Unexpected response from target daemon: {response_datagram}")
+                client_conn.sendall("9".encode("utf-8"))  # No response
+        except socket.timeout:
+            print("Timeout waiting for target daemon response.")
+            client_conn.sendall("9".encode("utf-8"))  # Notify client of timeout
+        except Exception as e:
+            print(f"Error handling chat request: {e}")
+            client_conn.sendall("9".encode("utf-8"))  # Notify client of error
+
+
+            
+    def handle_chat_request_from_daemon(self, datagram: Datagram, source_addr: Tuple[str, int]):
+        try:
+            print(f"Received chat request from daemon at {source_addr}. Forwarding to client.")
+
+            if not self.connected_to_client:
+                print("No connected client to handle the chat request.")
+                response_datagram = Datagram(
+                    type=0x01,
+                    operation=0x08,  # Chat rejected
+                    sequence=datagram.sequence + 1,
+                    user="chat-reject",
+                    payload="No client available",
+                    length=len("No client available")
+                )
+                self.daemon_udp_socket.sendto(response_datagram.to_bytes(), source_addr)
+                return
+
+            # Notify client
+            self.client_conn.sendall(f"4 {datagram.payload}".encode("utf-8"))
+
+            # Await client's response
+            client_response = self.client_conn.recv(1024).decode("utf-8").strip()
+            if client_response == "5":  # Chat accepted
+                response_datagram = Datagram(
+                    type=0x01,
+                    operation=0x07,  # Chat accepted
+                    sequence=datagram.sequence + 1,
+                    user="chat-accept",
+                    payload="Chat accepted",
+                    length=len("Chat accepted")
+                )
+                self.daemon_udp_socket.sendto(response_datagram.to_bytes(), source_addr)
+                print("Client accepted chat request.")
+            elif client_response == "6":  # Chat rejected
+                response_datagram = Datagram(
+                    type=0x01,
+                    operation=0x08,  # Chat rejected
+                    sequence=datagram.sequence + 1,
+                    user="chat-reject",
+                    payload="Chat rejected",
+                    length=len("Chat rejected")
+                )
+                self.daemon_udp_socket.sendto(response_datagram.to_bytes(), source_addr)
+                print("Client rejected chat request.")
+        except Exception as e:
+            print(f"Error processing chat request: {e}")
+
+
+
+
 
     def connect_and_listen_daemon(self):
         try:
@@ -123,42 +212,12 @@ class Daemon:
                     deserialized_datagram = Datagram.from_bytes(data)
                     print(f"Message received from daemon {addr}: {deserialized_datagram}")
 
-                    # Handle three-way handshake packets explicitly
-                    if deserialized_datagram.operation == 0x02:  # SYN
-                        print(f"Received SYN from {addr}. Sending SYN+ACK...")
-                        syn_ack_datagram = Datagram(
-                            type=0x01,
-                            operation=0x06,  # SYN+ACK
-                            sequence=deserialized_datagram.sequence + 1,
-                            user="daemon2",
-                            payload="SYN+ACK",
-                            length=7
-                        )
-                        self.send_datagram(self.daemon_udp_socket, syn_ack_datagram, addr)
-                        print(f"Sent SYN+ACK to {addr}: {syn_ack_datagram}")
-
-                    elif deserialized_datagram.operation == 0x06:  # SYN+ACK
-                        print(f"Received SYN+ACK from {addr}. Sending ACK...")
-                        ack_datagram = Datagram(
-                            type=0x01,
-                            operation=0x04,  # ACK
-                            sequence=deserialized_datagram.sequence + 1,
-                            user="daemon2",
-                            payload="ACK",
-                            length=3
-                        )
-                        self.send_datagram(self.daemon_udp_socket, ack_datagram, addr)
-                        print(f"Sent ACK to {addr}: {ack_datagram}")
-
-                    elif deserialized_datagram.operation == 0x04:  # ACK
-                        print(f"Received final ACK from {addr}. Handshake complete.")
-
-                    # Handle other operations
+                    if deserialized_datagram.operation == 0x03:  # Chat request
+                        self.handle_chat_request_from_daemon(deserialized_datagram, addr)
                     else:
-                        print(f"Received non-handshake datagram: {deserialized_datagram}")
-
+                        print(f"Unknown operation received: {deserialized_datagram.operation}")
                 except socket.timeout:
-                    print("Timeout waiting for datagram.")
+                    continue
                 except Exception as e:
                     print(f"Error receiving datagram: {e}")
         except Exception as e:
@@ -166,6 +225,7 @@ class Daemon:
         finally:
             self.daemon_udp_socket.close()
             print("Stopped listening for daemons.")
+
 
     def start(self):
         self.client_thread = threading.Thread(target=self.connect_and_listen_client, daemon=False)
