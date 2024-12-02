@@ -1,4 +1,4 @@
-
+import struct
 
 class Datagram:
     def __init__(self, type:bytes, operation:bytes, sequence:bytes, user:bytes, length:bytes, payload:bytes) -> None:
@@ -39,7 +39,7 @@ class Datagram:
             return False
         
         if self.type == b"\x01":
-            if self.operation not in [b"\x01", b"\x02", b"\x04", b"\x08"]:
+            if self.operation not in [b"\x01", b"\x02", b"\x04", b"\x08", b"\x06"]:
                 print("Invalid operation")
                 return False
         elif self.type == b"\x02":
@@ -60,4 +60,35 @@ class Datagram:
                 print("Payload is not a valid ASCII string for chat message")
                 return False
             
+        if int.from_bytes(self.length, 'big') != len(self.payload):
+            print("Length field does not match payload size")
+            return False
+            
         return True
+
+    def to_bytes(self):
+        if not self.check_datagram():
+            raise ValueError("Invalid datagram")
+        user_fixed = self.user.ljust(32, b'\x00')[:32]
+         
+        header = struct.pack(
+        "!BBB32sI",
+        self.type[0],
+        self.operation[0],
+        self.sequence[0],
+        user_fixed,
+        int.from_bytes(self.length, 'big')
+    )
+        return header + self.payload
+    
+    def from_bytes(data:bytes):
+        if len(data) < 38:
+            raise ValueError("Datagram is too short")
+        type = bytes([data[0]])
+        operation = bytes([data[1]])
+        sequence = bytes([data[2]])
+        user = data[3:35]
+        length = data[35:39]
+        payload = data[39:]
+        
+        return Datagram(type, operation, sequence, user, length, payload)
