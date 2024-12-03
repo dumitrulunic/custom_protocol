@@ -77,6 +77,19 @@ class Daemon:
         finally:
             self.socket_client.close()
             
+    def send_datagram_to_daemon(self, datagram:Datagram, ip:str, port:int=7777):
+        datagram_valid = datagram.check_datagram()
         
-    def handle_incoming_packet_from_daemon(self, data, addr):
+        if datagram_valid:
+            try:
+                serialized_datagram = datagram.to_bytes()
+                self.socket_daemon.sendto(serialized_datagram, (ip, port))
+                self.logger.log(f"Sent datagram to daemon {ip}:{port}")
+            except Exception as e:
+                self.logger.error(f"Failed to send datagram to daemon {ip}:{port}: {e}")
+        else:
+            self.logger.error("Datagram is invalid, checked during sending to daemon, not sending to daemon.")
+            
+        
+    def handle_incoming_datagram_from_daemon(self, data, addr):
         pass
