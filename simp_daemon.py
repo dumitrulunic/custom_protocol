@@ -124,25 +124,78 @@ class Daemon:
         except Exception as e:
             self.logger.error(f"Failed to handle control datagram: {e}")
             
-    def hanle_syn(self, datagram: Datagram, address: tuple):
+    def handle_syn(self, datagram: Datagram, address: tuple):
         try:
-            #! TODO
-            pass
+            with self.lock:
+                if address in self.active_connections:
+                    self.logger.error(f"Connection already exists with {address}")
+                    # send error datagram because connection already exists
+                    error_datagram = Datagram(
+                        type_field=0x01,
+                        operation=0x01,  # ERR
+                        sequence=datagram.sequence,
+                        user="Daemon",
+                        payload=b"Connection already exists")
+                    self.send_datagram_to_daemon(error_datagram, address[0])
+
+                    # send FIN datagram to close connection
+                    fin_datagram = Datagram(0x01, 0x08, 0, b"Connection already exists")
+                    self.send_datagram_to_daemon(fin_datagram, address[0])
+                else:
+                    # send SYN + ACK datagram
+                    self.logger.log(f"Accepting SYN from {address}.")
+                    syn_ack_datagram = Datagram(
+                    type_field=0x01,
+                    operation=0x06,  # SYN + ACK, logical OR
+                    sequence=datagram.sequence,
+                    user="Daemon",
+                    payload=b"")
+                    self.send_datagram_to_daemon(syn_ack_datagram, address[0])
+                        
         except Exception as e:
             self.logger.error(f"Failed to handle SYN: {e}")
     
     def handle_ack(self, datagram: Datagram, address: tuple):
         try:
-            #! TODO
-            pass
+            with self.lock:
+                if address not in self.active_connections:
+                    self.active_connections[address] = {
+                    "state": "connected",
+                    "sequence": 0
+                }
+                else:
+                    self.logger.log(f"ACK received from {address}, updating stop-and-wait state.")
+                    self.active_connections[address]["sequence"] = 1 - self.active_connections[address]["sequence"]
+                    #! TODO update stop and wait
         except Exception as e:
             self.logger.error(f"Failed to handle ACK: {e}")
     
     def handle_fin(self, datagram: Datagram, address: tuple):
         try:
-            #! TODO
-            pass
+            with self.lock:
+                if address in self.active_connections:
+                    self.logger.log(f"FIN received from {address}, terminating connection.")
+                    # Send ACK to confirm
+                    ack_datagram = Datagram(
+                        type_field=0x01,
+                        operation=0x04,
+                        sequence=datagram.sequence,
+                        user="Daemon",
+                        payload=b""
+                    )
+                    self.send_datagram_to_daemon(ack_datagram, address[0], address[1])
+
+                    # Remove the connection
+                    del self.active_connections[address]
+                else:
+                    self.logger.warning(f"FIN received from unknown address {address}, ignoring.")
         except Exception as e:
             self.logger.error(f"Failed to handle FIN: {e}")
+            
+    def handle_err(self, datagram: Datagram, address: tuple):
+        try:
+            self.logger.error(f"Error received from {address}: {datagram.payload.decode('ascii')}")
+        except Exception as e:
+            self.logger.error(f"Failed to handle ERR: {e}")
     
     
