@@ -83,4 +83,9 @@ class Datagram:
         payload = data[39:]
         
         logger.info(f"Datagram parsed: {type} {operation} {sequence} {user} {length} {payload}")
-        return Datagram(type, operation, sequence, user, length, payload)
+        
+        datagram = Datagram(type, operation, sequence, user, length, payload)
+        if not datagram.check_datagram():
+            raise ValueError("Invalid datagram")
+        
+        return datagram

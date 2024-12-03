@@ -78,18 +78,71 @@ class Daemon:
             self.socket_client.close()
             
     def send_datagram_to_daemon(self, datagram:Datagram, ip:str, port:int=7777):
-        datagram_valid = datagram.check_datagram()
-        
-        if datagram_valid:
-            try:
-                serialized_datagram = datagram.to_bytes()
-                self.socket_daemon.sendto(serialized_datagram, (ip, port))
-                self.logger.log(f"Sent datagram to daemon {ip}:{port}")
-            except Exception as e:
-                self.logger.error(f"Failed to send datagram to daemon {ip}:{port}: {e}")
-        else:
-            self.logger.error("Datagram is invalid, checked during sending to daemon, not sending to daemon.")
+        try:
+            serialized_datagram = datagram.to_bytes()
+            self.socket_daemon.sendto(serialized_datagram, (ip, port))
+            self.logger.log(f"Sent datagram to daemon {ip}:{port}")
+        except Exception as e:
+            self.logger.error(f"Failed to send datagram to daemon {ip}:{port}: {e}")
             
         
-    def handle_incoming_datagram_from_daemon(self, data, addr):
-        pass
+    def handle_incoming_datagram_from_daemon(self, data: bytes, address: tuple):
+        try:
+            datagram = Datagram.from_bytes(data)
+            self.logger.log(f"Received datagram from daemon {address}")
+            self.logger.log(f"Datagram: {datagram}")
+            type = datagram.type[0]
+            logger.log(f"Type of received datagam: {type}")
+            
+            if type == 0x01: #control datagram
+                self.handle_control_datagram(datagram)
+            # elif type == 0x02: # chat datagram #! TODO
+                # self.handle_chat_datagram(datagram)
+            else:
+                self.logger.error(f"Invalid type of datagram: {type}")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to handle incoming datagram from daemon {addr}: {e}")
+            
+    def handle_control_datagram(self, datagram: Datagram, address: tuple):
+        try:
+            operation = datagram.operation[0]
+            self.logger.log(f"Operation of received control datagram: {operation}")
+            if operation == 0x01:  # ERR
+                self.logger.error(f"Error received from {address}: {datagram.payload.decode('ascii')}")
+            elif operation == 0x02:  # SYN
+                self.logger.log(f"Received SYN from {address}, starting handshake.")
+                self.handle_syn(datagram, address)
+            elif operation == 0x04:  # ACK
+                self.logger.log(f"Received ACK from {address}")
+                self.handle_ack(datagram, address)
+            elif operation == 0x08:  # FIN
+                self.logger.log(f"Received FIN from {address}")
+                self.handle_fin(datagram, address)
+            else:
+                self.logger.error(f"Invalid operation of control datagram: {operation}")
+        except Exception as e:
+            self.logger.error(f"Failed to handle control datagram: {e}")
+            
+    def hanle_syn(self, datagram: Datagram, address: tuple):
+        try:
+            #! TODO
+            pass
+        except Exception as e:
+            self.logger.error(f"Failed to handle SYN: {e}")
+    
+    def handle_ack(self, datagram: Datagram, address: tuple):
+        try:
+            #! TODO
+            pass
+        except Exception as e:
+            self.logger.error(f"Failed to handle ACK: {e}")
+    
+    def handle_fin(self, datagram: Datagram, address: tuple):
+        try:
+            #! TODO
+            pass
+        except Exception as e:
+            self.logger.error(f"Failed to handle FIN: {e}")
+    
+    
