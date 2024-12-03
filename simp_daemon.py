@@ -2,6 +2,7 @@ import socket
 import threading
 from Datagram import Datagram
 from logger import logger
+import time
 
 class Daemon:
     def __init__(self, ip:str, port:int = 7777) -> None:
@@ -112,7 +113,7 @@ class Daemon:
                 self.logger.error(f"Error received from {address}: {datagram.payload.decode('ascii')}")
             elif operation == 0x02:  # SYN
                 self.logger.log(f"Received SYN from {address}, starting handshake.")
-                self.handle_syn(datagram, address)
+                self.handshake_init(target_ip=address[0], target_port=address[1], is_initiator=False, incoming_datagram=datagram)
             elif operation == 0x04:  # ACK
                 self.logger.log(f"Received ACK from {address}")
                 self.handle_ack(datagram, address)
@@ -198,4 +199,86 @@ class Daemon:
         except Exception as e:
             self.logger.error(f"Failed to handle ERR: {e}")
     
-    
+    def handshake_init(self, target_ip: str, target_port: int, is_initiator: bool = True, incoming_datagram=None):
+        try:
+            sequence = 0
+
+            if is_initiator:
+                # Step 1: Send SYN
+                self.logger.log(f"Initiating handshake with {target_ip}:{target_port}. Sending SYN.")
+                syn_datagram = Datagram(
+                    type_field=0x01,
+                    operation=0x02,
+                    sequence=sequence,
+                    user="Daemon",
+                    payload=b""
+                )
+                self.send_datagram_to_daemon(syn_datagram, target_ip, target_port)
+
+                # Wait for SYN+ACK
+                for _ in range(3):  # 3 tryes
+                    if self.wait_for_syn_ack(sequence, target_ip, target_port):
+                        self.logger.log(f"Handshake successful with {target_ip}:{target_port}")
+                        break
+                    self.logger.log(f"Retrying SYN to {target_ip}:{target_port}")
+                    self.send_datagram_to_daemon(syn_datagram, target_ip, target_port)
+                else:
+                    self.logger.error(f"Failed to complete handshake with {target_ip}:{target_port}")
+                    return False
+
+                # Step 3: Send ACK
+                ack_datagram = Datagram(
+                    type_field=0x01,
+                    operation=0x04,
+                    sequence=sequence,
+                    user="Daemon",
+                    payload=b""
+                )
+                self.send_datagram_to_daemon(ack_datagram, target_ip, target_port)
+
+            else:
+                # Responding to an incoming SYN
+                self.logger.log(f"Responding to SYN from {target_ip}:{target_port}. Sending SYN+ACK.")
+                syn_ack_datagram = Datagram(
+                    type_field=0x01,
+                    operation=0x06,
+                    sequence=incoming_datagram.sequence,
+                    user="Daemon",
+                    payload=b""
+                )
+                self.send_datagram_to_daemon(syn_ack_datagram, target_ip, target_port)
+
+                # Wait for ACK
+                for _ in range(3):  # 3 times
+                    if self.wait_for_ack(incoming_datagram.sequence, target_ip, target_port):
+                        self.logger.log(f"Handshake successful with {target_ip}:{target_port}")
+                        break
+                else:
+                    self.logger.error(f"Handshake failed with {target_ip}:{target_port}")
+                    return False
+
+            # Mark connection as active
+            with self.lock:
+                self.active_connections[(target_ip, target_port)] = {
+                    "state": "connected",
+                    "sequence": sequence
+                }
+            return True
+        except Exception as e:
+            self.logger.error(f"Handshake error with {target_ip}:{target_port}: {e}")
+            return False
+
+        
+    def wait_for_ack(self, sequence: int, target_ip: str, target_port: int, timeout=5):
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            try:
+                data, addr = self.socket_daemon.recvfrom(1024)
+                if addr == (target_ip, target_port):
+                    datagram = Datagram.from_bytes(data)
+                    if datagram.type[0] == 0x01 and datagram.operation[0] == 0x04 and datagram.sequence == sequence:
+                        return True
+            except socket.timeout:
+                continue
+        return False
+
