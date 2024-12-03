@@ -24,26 +24,26 @@ class Datagram:
         
     def check_datagram(self):
         
-        if self.type not in (0x01, 0x02):
+        if self.type not in (b'\x01', b'\x02'):
             logger.error(f"Invalid type: {self.type}")
             return False
 
-        if self.type == 0x01:  # control datagram
-            if self.operation not in (0x01, 0x02, 0x04, 0x08):
+        if self.type == b'\x01':  # control datagram
+            if self.operation not in (b'\x01', b'\x02', b'\x04', b'\x08'):
                 logger.error(f"Invalid operation for control datagram: {self.operation}")
                 return False
             
-        elif self.type == 0x02:  # chat datagram
-            if self.operation != 0x01:
+        elif self.type == b'\x02':  # chat datagram
+            if self.operation != b'\x01':
                 logger.error(f"Invalid operation for chat datagram: {self.operation}")
                 return False
             
-        if self.sequence not in range(0, 1):
+        if self.sequence not in (b'\x00', b'\x01'):
             logger.error(f"Invalid sequence: {self.sequence}")
             return False
         
-        if self.length != len(self.payload):
-            logger.error(f"Invalid length, must be length of paylaod: {self.length}")
+        if int.from_bytes(self.length, 'big') != len(self.payload):
+            logger.error(f"Invalid length, must be length of payload: {self.length}")
             return False
 
         try:
