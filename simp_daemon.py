@@ -95,15 +95,15 @@ class Daemon:
             datagram = Datagram.from_bytes(data)
             self.logger.info(f"Received datagram from daemon {address}")
             self.logger.info(f"Datagram: {datagram}")
-            type = datagram.type[0]
+            datagram_type = datagram.datagram_type[0]
             logger.info(f"Type of received datagam: {type}")
             
-            if type == 0x01: #control datagram
-                self.handle_control_datagram(datagram)
+            if datagram_type == 0x01: #control datagram
+                self.handle_control_datagram(datagram, address)
             # elif type == 0x02: # chat datagram #! TODO
                 # self.handle_chat_datagram(datagram)
             else:
-                self.logger.error(f"Invalid type of datagram: {type}")
+                self.logger.error(f"Invalid type of datagram: {datagram_type}")
             
         except Exception as e:
             self.logger.error(f"Failed to handle incoming datagram from daemon {address}: {e}")
@@ -135,7 +135,7 @@ class Daemon:
                     self.logger.error(f"Connection already exists with {address}")
                     # send error datagram because connection already exists
                     error_datagram = Datagram(
-                        type_field=b'\x01',
+                        datagram_type=b'\x01',
                         operation=b'\x01',  # ERR
                         sequence=datagram.sequence,
                         user="Daemon",
@@ -149,7 +149,7 @@ class Daemon:
                     # send SYN + ACK datagram
                     self.logger.info(f"Accepting SYN from {address}.")
                     syn_ack_datagram = Datagram(
-                    type_field=b'\x01',
+                    datagram_type=b'\x01',
                     operation=b'\x06',  # SYN + ACK, logical OR
                     sequence=datagram.sequence,
                     user="Daemon",
@@ -181,7 +181,7 @@ class Daemon:
                     self.logger.info(f"FIN received from {address}, terminating connection.")
                     # Send ACK to confirm
                     ack_datagram = Datagram(
-                        type_field=b'\x01',
+                        datagram_type=b'\x01',
                         operation=b'\x04',
                         sequence=datagram.sequence,
                         user="Daemon",
@@ -210,7 +210,7 @@ class Daemon:
                 # Step 1: Send SYN
                 self.logger.info(f"Initiating handshake with {target_ip}:{target_port}. Sending SYN.")
                 syn_datagram = Datagram(
-                    type_field=b'\x01',
+                    datagram_type=b'\x01',
                     operation=b'\x02',
                     sequence=sequence,
                     user="Daemon",
@@ -231,7 +231,7 @@ class Daemon:
 
                 # Step 3: Send ACK
                 ack_datagram = Datagram(
-                    type_field=b'\x01',
+                    datagram_type=b'\x01',
                     operation=b'\x04',
                     sequence=sequence,
                     user="Daemon",
@@ -243,7 +243,7 @@ class Daemon:
                 # Responding to an incoming SYN
                 self.logger.info(f"Responding to SYN from {target_ip}:{target_port}. Sending SYN+ACK.")
                 syn_ack_datagram = Datagram(
-                    type_field=b'\x01',
+                    datagram_type=b'\x01',
                     operation=b'\x06',
                     sequence=incoming_datagram.sequence,
                     user="Daemon",
@@ -279,7 +279,7 @@ class Daemon:
                 data, addr = self.socket_daemon.recvfrom(1024)
                 if addr == (target_ip, target_port):
                     datagram = Datagram.from_bytes(data)
-                    if datagram.type[0] == 0x01 and datagram.operation[0] == 0x04 and datagram.sequence == sequence:
+                    if datagram.datagram_type[0] == 0x01 and datagram.operation[0] == 0x04 and datagram.sequence == sequence:
                         return True
             except socket.timeout:
                 continue

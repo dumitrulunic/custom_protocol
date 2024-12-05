@@ -2,8 +2,8 @@ import struct
 from logger import logger
 
 class Datagram:
-    def __init__(self, type:bytes, operation:bytes, sequence:bytes, user:bytes, length:bytes, payload:bytes) -> None:
-        self.type = type
+    def __init__(self, datagram_type:bytes, operation:bytes, sequence:bytes, user:bytes, length:bytes, payload:bytes) -> None:
+        self.datagram_type = datagram_type
         self.operation = operation
         self.sequence = sequence
         self.user = user.ljust(32)[:32] # fixed 32 bytes length
@@ -24,16 +24,16 @@ class Datagram:
         
     def check_datagram(self):
         
-        if self.type not in (b'\x01', b'\x02'):
-            logger.error(f"Invalid type: {self.type}")
+        if self.datagram_type not in (b'\x01', b'\x02'):
+            logger.error(f"Invalid type: {self.datagram_type}")
             return False
 
-        if self.type == b'\x01':  # control datagram
+        if self.datagram_type == b'\x01':  # control datagram
             if self.operation not in (b'\x01', b'\x02', b'\x04', b'\x08'):
                 logger.error(f"Invalid operation for control datagram: {self.operation}")
                 return False
             
-        elif self.type == b'\x02':  # chat datagram
+        elif self.datagram_type == b'\x02':  # chat datagram
             if self.operation != b'\x01':
                 logger.error(f"Invalid operation for chat datagram: {self.operation}")
                 return False
@@ -63,7 +63,7 @@ class Datagram:
          
         header = struct.pack(
         "!BBB32sI",
-        self.type[0],
+        self.datagram_type[0],
         self.operation[0],
         self.sequence[0],
         user_fixed,
@@ -75,16 +75,16 @@ class Datagram:
     def from_bytes(data:bytes):
         if len(data) < 38:
             raise ValueError("Datagram is too short")
-        type = bytes([data[0]])
+        datagram_type = bytes([data[0]])
         operation = bytes([data[1]])
         sequence = bytes([data[2]])
         user = data[3:35]
         length = data[35:39]
         payload = data[39:]
         
-        logger.info(f"Datagram parsed: {type} {operation} {sequence} {user} {length} {payload}")
+        logger.info(f"Datagram parsed: {datagram_type} {operation} {sequence} {user} {length} {payload}")
         
-        datagram = Datagram(type, operation, sequence, user, length, payload)
+        datagram = Datagram(datagram_type, operation, sequence, user, length, payload)
         if not datagram.check_datagram():
             raise ValueError("Invalid datagram")
         

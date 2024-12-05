@@ -34,7 +34,7 @@ def test_send_datagram():
     """Test sending a datagram from Daemon1 to Daemon2."""
     print("Running test_send_datagram...")
     datagram = Datagram(
-        type=b'\x01',
+        datagram_type=b'\x01',
         operation=b'\x02',  # SYN
         sequence=b'\x00',
         user=b"TestUser",
@@ -70,7 +70,7 @@ def test_invalid_datagram():
     """Test handling of invalid datagrams."""
     print("Running test_invalid_datagram...")
     invalid_datagram = Datagram(
-        type=b'\x03',  # Invalid type
+        datagram_type=b'\x03',  # Invalid type
         operation=b'\x00',
         sequence=b'\x00',
         user=b"InvalidUser",
@@ -92,7 +92,7 @@ def test_fin_termination():
     daemon1.handshake_init("127.0.0.2", 7777)
     
     fin_datagram = Datagram(
-        type=b'\x01',
+        datagram_type=b'\x01',
         operation=b'\x08',  # FIN
         sequence=b'\x00',
         user=b"TestUser",
