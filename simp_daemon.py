@@ -50,9 +50,9 @@ class Daemon:
 
             while self.running:
                 try:
-                    data, addr = self.socket_daemon.recvfrom(1024)
-                    self.logger.info(f"Received packet from daemon {addr}")
-                    self.handle_incoming_datagram_from_daemon(data, addr)
+                    data, address = self.socket_daemon.recvfrom(1024)
+                    self.logger.info(f"Received packet from daemon {address}")
+                    self.handle_incoming_datagram_from_daemon(data, address)
                 except socket.timeout:
                     continue
         except Exception as e:
@@ -70,9 +70,9 @@ class Daemon:
             
             while self.running:
                 try:
-                    conn, addr = self.socket_client.accept()
-                    self.logger.info(f"Received packet from client {addr}")
-                    self.handle_incoming_packet_from_client(conn, addr)
+                    conn, address = self.socket_client.accept()
+                    self.logger.info(f"Received packet from client {address}")
+                    self.handle_incoming_packet_from_client(conn, address)
                 except socket.timeout:
                     continue
                 
@@ -106,7 +106,7 @@ class Daemon:
                 self.logger.error(f"Invalid type of datagram: {type}")
             
         except Exception as e:
-            self.logger.error(f"Failed to handle incoming datagram from daemon {addr}: {e}")
+            self.logger.error(f"Failed to handle incoming datagram from daemon {address}: {e}")
             
     def handle_control_datagram(self, datagram: Datagram, address: tuple):
         try:
