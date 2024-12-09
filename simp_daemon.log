@@ -257,3 +257,202 @@
 2024-12-09 11:44:50,202 [INFO] Operation of received control datagram: 4
 2024-12-09 11:44:50,202 [INFO] Received ACK from ('127.0.0.1', 7777)
 2024-12-09 11:44:50,202 [INFO] Connection with ('127.0.0.1', 7777) established.
+2024-12-09 11:56:10,305 [INFO] Daemon started on 127.0.0.1:7777
+2024-12-09 11:56:17,136 [INFO] Daemon started on 127.0.0.2:7777
+2024-12-09 11:56:24,233 [INFO] Received packet from client ('127.0.0.1', 49686)
+2024-12-09 11:56:24,235 [INFO] Started handling commands from client ('127.0.0.1', 49686).
+2024-12-09 11:56:25,982 [DEBUG] Received data from client ('127.0.0.1', 49686): 1 dima
+2024-12-09 11:56:25,982 [INFO] Username 'dima' sent to the daemon.
+2024-12-09 11:56:25,982 [INFO] Client username set to 'dima'.
+2024-12-09 11:56:25,982 [INFO] Sent ACK to client.
+2024-12-09 11:56:25,982 [INFO] Received username 'dima' from ('127.0.0.1', 49686)
+2024-12-09 11:56:25,982 [INFO] Client connection dictionary: {'username': 'dima', 'address': ('127.0.0.1', 7778)}
+2024-12-09 11:56:33,301 [INFO] Received packet from client ('127.0.0.2', 49774)
+2024-12-09 11:56:33,301 [INFO] Started handling commands from client ('127.0.0.2', 49774).
+2024-12-09 11:56:34,748 [DEBUG] Received data from client ('127.0.0.2', 49774): 1 mihai
+2024-12-09 11:56:34,748 [INFO] Username 'mihai' sent to the daemon.
+2024-12-09 11:56:34,749 [INFO] Client username set to 'mihai'.
+2024-12-09 11:56:34,749 [INFO] Sent ACK to client.
+2024-12-09 11:56:34,749 [INFO] Received username 'mihai' from ('127.0.0.2', 49774)
+2024-12-09 11:56:34,749 [INFO] Client connection dictionary: {'username': 'mihai', 'address': ('127.0.0.2', 7778)}
+2024-12-09 11:56:36,263 [DEBUG] Received data from client ('127.0.0.2', 49774): 3
+2024-12-09 11:56:36,263 [INFO] Sent wait_chat command to the daemon.
+2024-12-09 11:56:36,263 [INFO] Received wait_chat command from ('127.0.0.2', 49774).
+2024-12-09 11:56:36,263 [INFO] Received acknowledgement from Daemon.
+2024-12-09 11:56:36,263 [INFO] Daemon is now waiting for an incoming chat initiation...
+2024-12-09 11:56:48,723 [DEBUG] Received data from client ('127.0.0.1', 49686): 2 127.0.0.2
+2024-12-09 11:56:48,723 [INFO] Sent start_chat command to the daemon with target IP 127.0.0.2.
+2024-12-09 11:56:48,723 [INFO] Received start_chat command from ('127.0.0.1', 49686) to 127.0.0.2:7777
+2024-12-09 11:56:48,723 [INFO] Received acknowledgement from Daemon.
+2024-12-09 11:56:48,723 [INFO] Initiating chat with daemon at 127.0.0.2:7777.
+2024-12-09 11:56:48,723 [INFO] Initiating handshake with 127.0.0.2:7777. Sending SYN.
+2024-12-09 11:56:48,724 [INFO] Datagram created: b'\x01\x02\x00Daemon\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' b''
+2024-12-09 11:56:48,724 [INFO] Sent datagram to daemon 127.0.0.2:7777
+2024-12-09 11:56:48,724 [INFO] Received packet from daemon ('127.0.0.1', 7777)
+2024-12-09 11:56:48,724 [INFO] Datagram parsed: 1 2 0 b'Daemon' 0 b''
+2024-12-09 11:56:48,724 [INFO] Received datagram from daemon ('127.0.0.1', 7777)
+2024-12-09 11:56:48,724 [INFO] Datagram: <Datagram.Datagram object at 0x10137acf0>
+2024-12-09 11:56:48,724 [INFO] Type of received datagam: <class 'type'>
+2024-12-09 11:56:48,725 [INFO] Operation of received control datagram: 2
+2024-12-09 11:56:48,725 [INFO] Received SYN from ('127.0.0.1', 7777), starting handshake.
+2024-12-09 11:56:48,725 [INFO] Responding to SYN from 127.0.0.1:7777. Sending SYN+ACK.
+2024-12-09 11:56:48,725 [INFO] Datagram created: b'\x01\x06\x00Daemon\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' b''
+2024-12-09 11:56:48,725 [INFO] Sent datagram to daemon 127.0.0.1:7777
+2024-12-09 11:56:48,725 [INFO] Datagram parsed: 1 6 0 b'Daemon' 0 b''
+2024-12-09 11:56:48,725 [INFO] Received SYN+ACK from ('127.0.0.2', 7777)
+2024-12-09 11:56:48,725 [INFO] Received SYN+ACK from 127.0.0.2:7777. Sending ACK.
+2024-12-09 11:56:48,726 [INFO] Datagram created: b'\x01\x04\x00Daemon\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' b''
+2024-12-09 11:56:48,726 [INFO] Sent datagram to daemon 127.0.0.2:7777
+2024-12-09 11:56:48,726 [INFO] Received packet from daemon ('127.0.0.1', 7777)
+2024-12-09 11:56:48,726 [INFO] Connection with ('127.0.0.2', 7777) established.
+2024-12-09 11:56:48,726 [INFO] Connection with ('127.0.0.2', 7777) established.
+2024-12-09 11:56:48,726 [INFO] Datagram parsed: 1 4 0 b'Daemon' 0 b''
+2024-12-09 11:56:48,726 [INFO] Chat handshake with 127.0.0.2:7777 completed successfully.
+2024-12-09 11:56:48,726 [INFO] Received datagram from daemon ('127.0.0.1', 7777)
+2024-12-09 11:56:48,726 [INFO] Chat successfully started with daemon at 127.0.0.2:7777.
+2024-12-09 11:56:48,726 [INFO] Datagram: <Datagram.Datagram object at 0x10137a510>
+2024-12-09 11:56:48,726 [INFO] Sent ACK to client.
+2024-12-09 11:56:48,726 [INFO] Type of received datagam: <class 'type'>
+2024-12-09 11:56:48,726 [INFO] Operation of received control datagram: 4
+2024-12-09 11:56:48,726 [INFO] Received ACK from ('127.0.0.1', 7777)
+2024-12-09 11:56:48,726 [INFO] Connection with ('127.0.0.1', 7777) established.
+2024-12-09 12:05:35,870 [INFO] Daemon started on 127.0.0.1:7777
+2024-12-09 12:05:41,657 [INFO] Daemon started on 127.0.0.2:7777
+2024-12-09 12:05:41,659 [ERROR] Client packet listener encountered an error: [Errno 48] Address already in use
+2024-12-09 12:05:47,118 [INFO] Received packet from client ('127.0.0.1', 55149)
+2024-12-09 12:05:47,118 [INFO] Started handling commands from client ('127.0.0.1', 55149).
+2024-12-09 12:05:48,295 [DEBUG] Received data from client ('127.0.0.1', 55149): 1 dima
+2024-12-09 12:05:48,295 [INFO] Username 'dima' sent to the daemon.
+2024-12-09 12:05:48,296 [INFO] Client username set to 'dima'.
+2024-12-09 12:05:48,296 [INFO] Sent ACK to client.
+2024-12-09 12:05:48,296 [INFO] Received username 'dima' from ('127.0.0.1', 55149)
+2024-12-09 12:05:48,296 [INFO] Client connection dictionary: {'username': 'dima', 'address': ('127.0.0.1', 7778)}
+2024-12-09 12:05:54,137 [ERROR] Connection to Daemon at 127.0.0.2:7778 refused.
+2024-12-09 12:06:13,990 [INFO] Daemon started on 127.0.0.1:7777
+2024-12-09 12:06:19,492 [INFO] Daemon started on 127.0.0.2:7777
+2024-12-09 12:06:24,885 [INFO] Received packet from client ('127.0.0.1', 55519)
+2024-12-09 12:06:24,886 [INFO] Started handling commands from client ('127.0.0.1', 55519).
+2024-12-09 12:06:26,701 [DEBUG] Received data from client ('127.0.0.1', 55519): 1 dima
+2024-12-09 12:06:26,701 [INFO] Username 'dima' sent to the daemon.
+2024-12-09 12:06:26,702 [INFO] Client username set to 'dima'.
+2024-12-09 12:06:26,702 [INFO] Sent ACK to client.
+2024-12-09 12:06:26,702 [INFO] Received username 'dima' from ('127.0.0.1', 55519)
+2024-12-09 12:06:26,702 [INFO] Client connection dictionary: {'username': 'dima', 'address': ('127.0.0.1', 7778)}
+2024-12-09 12:06:32,183 [INFO] Received packet from client ('127.0.0.2', 55592)
+2024-12-09 12:06:32,183 [INFO] Started handling commands from client ('127.0.0.2', 55592).
+2024-12-09 12:06:34,125 [DEBUG] Received data from client ('127.0.0.2', 55592): 1 mihai
+2024-12-09 12:06:34,125 [INFO] Username 'mihai' sent to the daemon.
+2024-12-09 12:06:34,127 [INFO] Client username set to 'mihai'.
+2024-12-09 12:06:34,127 [INFO] Sent ACK to client.
+2024-12-09 12:06:34,127 [INFO] Received username 'mihai' from ('127.0.0.2', 55592)
+2024-12-09 12:06:34,127 [INFO] Client connection dictionary: {'username': 'mihai', 'address': ('127.0.0.2', 7778)}
+2024-12-09 12:06:46,631 [INFO] Sent start_chat command to the daemon with target IP 127.0.0.2.
+2024-12-09 12:06:46,631 [DEBUG] Received data from client ('127.0.0.1', 55519): 2 127.0.0.2
+2024-12-09 12:06:46,631 [INFO] Received acknowledgement from Daemon.
+2024-12-09 12:06:46,631 [INFO] Received start_chat command from ('127.0.0.1', 55519) to 127.0.0.2:7777
+2024-12-09 12:06:46,631 [INFO] Initiating chat with daemon at 127.0.0.2:7777.
+2024-12-09 12:06:46,632 [INFO] Initiating handshake with 127.0.0.2:7777. Sending SYN.
+2024-12-09 12:06:46,632 [INFO] Datagram created: b'\x01\x02\x00Daemon\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' b''
+2024-12-09 12:06:46,632 [INFO] Sent datagram to daemon 127.0.0.2:7777
+2024-12-09 12:06:46,632 [INFO] Received packet from daemon ('127.0.0.1', 7777)
+2024-12-09 12:06:46,632 [INFO] Datagram parsed: 1 2 0 b'Daemon' 0 b''
+2024-12-09 12:06:46,632 [INFO] Received datagram from daemon ('127.0.0.1', 7777)
+2024-12-09 12:06:46,632 [INFO] Datagram: <Datagram.Datagram object at 0x10116ef90>
+2024-12-09 12:06:46,633 [INFO] Type of received datagam: <class 'type'>
+2024-12-09 12:06:46,633 [INFO] Operation of received control datagram: 2
+2024-12-09 12:06:46,633 [INFO] Received SYN from ('127.0.0.1', 7777), starting handshake.
+2024-12-09 12:06:46,633 [INFO] Responding to SYN from 127.0.0.1:7777. Sending SYN+ACK.
+2024-12-09 12:06:46,633 [INFO] Datagram created: b'\x01\x06\x00Daemon\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' b''
+2024-12-09 12:06:46,633 [INFO] Sent datagram to daemon 127.0.0.1:7777
+2024-12-09 12:06:46,633 [INFO] Datagram parsed: 1 6 0 b'Daemon' 0 b''
+2024-12-09 12:06:46,633 [INFO] Received SYN+ACK from ('127.0.0.2', 7777)
+2024-12-09 12:06:46,633 [INFO] Received SYN+ACK from 127.0.0.2:7777. Sending ACK.
+2024-12-09 12:06:46,633 [INFO] Datagram created: b'\x01\x04\x00Daemon\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' b''
+2024-12-09 12:06:46,634 [INFO] Sent datagram to daemon 127.0.0.2:7777
+2024-12-09 12:06:46,634 [INFO] Received packet from daemon ('127.0.0.1', 7777)
+2024-12-09 12:06:46,634 [INFO] Connection with ('127.0.0.2', 7777) established.
+2024-12-09 12:06:46,634 [INFO] Connection with ('127.0.0.2', 7777) established.
+2024-12-09 12:06:46,634 [INFO] Datagram parsed: 1 4 0 b'Daemon' 0 b''
+2024-12-09 12:06:46,634 [INFO] Chat handshake with 127.0.0.2:7777 completed successfully.
+2024-12-09 12:06:46,634 [INFO] Received datagram from daemon ('127.0.0.1', 7777)
+2024-12-09 12:06:46,634 [INFO] Chat successfully started with daemon at 127.0.0.2:7777.
+2024-12-09 12:06:46,634 [INFO] Datagram: <Datagram.Datagram object at 0x10116f080>
+2024-12-09 12:06:46,634 [INFO] Type of received datagam: <class 'type'>
+2024-12-09 12:06:46,634 [INFO] Sent ACK to client.
+2024-12-09 12:06:46,634 [INFO] Operation of received control datagram: 4
+2024-12-09 12:06:46,634 [INFO] Received ACK from ('127.0.0.1', 7777)
+2024-12-09 12:06:46,634 [INFO] Connection with ('127.0.0.1', 7777) established.
+2024-12-09 12:12:15,310 [INFO] Daemon started on 127.0.0.1:7777
+2024-12-09 12:12:21,366 [INFO] Received packet from client ('127.0.0.1', 59055)
+2024-12-09 12:12:21,366 [INFO] Started handling commands from client ('127.0.0.1', 59055).
+2024-12-09 12:12:22,975 [INFO] Username 'dima' sent to the daemon.
+2024-12-09 12:12:22,975 [DEBUG] Received data from client ('127.0.0.1', 59055): 1 dima
+2024-12-09 12:12:22,978 [INFO] Client username set to 'dima'.
+2024-12-09 12:12:22,978 [INFO] Sent ACK to client.
+2024-12-09 12:12:22,978 [INFO] Received username 'dima' from ('127.0.0.1', 59055)
+2024-12-09 12:12:22,978 [INFO] Client connection dictionary: {'username': 'dima', 'address': ('127.0.0.1', 7778)}
+2024-12-09 12:12:30,571 [INFO] Daemon started on 127.0.0.2:7777
+2024-12-09 12:12:36,205 [INFO] Received packet from client ('127.0.0.2', 59204)
+2024-12-09 12:12:36,207 [INFO] Started handling commands from client ('127.0.0.2', 59204).
+2024-12-09 12:12:37,620 [DEBUG] Received data from client ('127.0.0.2', 59204): 1 mihai
+2024-12-09 12:12:37,620 [INFO] Username 'mihai' sent to the daemon.
+2024-12-09 12:12:37,620 [INFO] Client username set to 'mihai'.
+2024-12-09 12:12:37,620 [INFO] Sent ACK to client.
+2024-12-09 12:12:37,621 [INFO] Received username 'mihai' from ('127.0.0.2', 59204)
+2024-12-09 12:12:37,621 [INFO] Client connection dictionary: {'username': 'mihai', 'address': ('127.0.0.2', 7778)}
+2024-12-09 12:12:43,893 [INFO] Sent start_chat command to the daemon with target IP 127.0.0.1.
+2024-12-09 12:12:43,893 [DEBUG] Received data from client ('127.0.0.2', 59204): 2 127.0.0.1
+2024-12-09 12:12:43,893 [INFO] Received start_chat command from ('127.0.0.2', 59204) to 127.0.0.1:7777
+2024-12-09 12:12:43,893 [INFO] Initiating chat with daemon at 127.0.0.1:7777.
+2024-12-09 12:12:43,893 [INFO] Initiating handshake with 127.0.0.1:7777. Sending SYN.
+2024-12-09 12:12:43,893 [INFO] Datagram created: b'\x01\x02\x00Daemon\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' b''
+2024-12-09 12:12:43,893 [INFO] Sent datagram to daemon 127.0.0.1:7777
+2024-12-09 12:12:43,894 [INFO] Received packet from daemon ('127.0.0.2', 7777)
+2024-12-09 12:12:43,894 [INFO] Datagram parsed: 1 2 0 b'Daemon' 0 b''
+2024-12-09 12:12:43,894 [INFO] Received datagram from daemon ('127.0.0.2', 7777)
+2024-12-09 12:12:43,894 [INFO] Datagram: <Datagram.Datagram object at 0x101282ed0>
+2024-12-09 12:12:43,894 [INFO] Type of received datagam: <class 'type'>
+2024-12-09 12:12:43,894 [INFO] Operation of received control datagram: 2
+2024-12-09 12:12:43,894 [INFO] Received SYN from ('127.0.0.2', 7777), starting handshake.
+2024-12-09 12:12:43,894 [INFO] Responding to SYN from 127.0.0.2:7777. Sending SYN+ACK.
+2024-12-09 12:12:43,894 [INFO] Datagram created: b'\x01\x06\x00Daemon\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' b''
+2024-12-09 12:12:43,894 [INFO] Sent datagram to daemon 127.0.0.2:7777
+2024-12-09 12:12:43,894 [INFO] Datagram parsed: 1 6 0 b'Daemon' 0 b''
+2024-12-09 12:12:43,894 [INFO] Received SYN+ACK from ('127.0.0.1', 7777)
+2024-12-09 12:12:43,894 [INFO] Received SYN+ACK from 127.0.0.1:7777. Sending ACK.
+2024-12-09 12:12:43,894 [INFO] Datagram created: b'\x01\x04\x00Daemon\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' b''
+2024-12-09 12:12:43,894 [INFO] Sent datagram to daemon 127.0.0.1:7777
+2024-12-09 12:12:43,894 [INFO] Connection with ('127.0.0.1', 7777) established.
+2024-12-09 12:12:43,894 [INFO] Received packet from daemon ('127.0.0.2', 7777)
+2024-12-09 12:12:43,894 [INFO] Connection with ('127.0.0.1', 7777) established.
+2024-12-09 12:12:43,894 [INFO] Datagram parsed: 1 4 0 b'Daemon' 0 b''
+2024-12-09 12:12:43,894 [INFO] Chat handshake with 127.0.0.1:7777 completed successfully.
+2024-12-09 12:12:43,894 [INFO] Received datagram from daemon ('127.0.0.2', 7777)
+2024-12-09 12:12:43,894 [INFO] Chat successfully started with daemon at 127.0.0.1:7777.
+2024-12-09 12:12:43,895 [INFO] Datagram: <Datagram.Datagram object at 0x101282ff0>
+2024-12-09 12:12:43,895 [INFO] Sent ACK to client.
+2024-12-09 12:12:43,895 [INFO] Type of received datagam: <class 'type'>
+2024-12-09 12:12:43,895 [INFO] Operation of received control datagram: 4
+2024-12-09 12:12:43,895 [INFO] Received ACK from ('127.0.0.2', 7777)
+2024-12-09 12:12:43,895 [INFO] Connection with ('127.0.0.2', 7777) established.
+2024-12-09 12:12:52,146 [DEBUG] Received data from client ('127.0.0.1', 59055): 2 127.0.0.2
+2024-12-09 12:12:52,146 [INFO] Sent start_chat command to the daemon with target IP 127.0.0.2.
+2024-12-09 12:12:52,147 [INFO] Received start_chat command from ('127.0.0.1', 59055) to 127.0.0.2:7777
+2024-12-09 12:12:52,147 [INFO] Initiating chat with daemon at 127.0.0.2:7777.
+2024-12-09 12:12:52,147 [WARNING] Handshake already completed with 127.0.0.2:7777.
+2024-12-09 12:12:52,147 [INFO] Connection with ('127.0.0.2', 7777) established.
+2024-12-09 12:12:52,147 [INFO] Chat handshake with 127.0.0.2:7777 completed successfully.
+2024-12-09 12:12:52,147 [INFO] Chat successfully started with daemon at 127.0.0.2:7777.
+2024-12-09 12:12:52,147 [INFO] Sent ACK to client.
+2024-12-09 12:13:05,378 [INFO] Sent message: dima message
+2024-12-09 12:13:05,378 [DEBUG] Received data from client ('127.0.0.2', 59204): 4 dima message
+2024-12-09 12:13:05,380 [INFO] Relaying message to daemon 127.0.0.1:7777: dima message
+2024-12-09 12:13:05,380 [INFO] Datagram created: b'\x02\x01\x01mihai                           \x00\x00\x00\x0c' b'dima message'
+2024-12-09 12:13:05,380 [INFO] Sent datagram to daemon 127.0.0.1:7777
+2024-12-09 12:13:05,380 [INFO] Received packet from daemon ('127.0.0.2', 7777)
+2024-12-09 12:13:05,381 [INFO] Datagram parsed: 2 1 1 b'mihai                           ' 12 b'dima message'
+2024-12-09 12:13:05,381 [INFO] Received datagram from daemon ('127.0.0.2', 7777)
+2024-12-09 12:13:05,381 [INFO] Datagram: <Datagram.Datagram object at 0x101282ff0>
+2024-12-09 12:13:05,381 [INFO] Type of received datagam: <class 'type'>
+2024-12-09 12:13:05,381 [INFO] Received message from mihai                           @('127.0.0.2', 7777): dima message
+2024-12-09 12:13:05,381 [ERROR] Error handling chat datagram from ('127.0.0.2', 7777): 'conn'

@@ -150,24 +150,22 @@ class Daemon:
                 self.logger.error(f"Invalid operation of control datagram: {operation}")
         except Exception as e:
             self.logger.error(f"Failed to handle control datagram: {e}")
-
             
-    # def relay_message_to_other_daemon(self, message: str):
-    #     if not self.active_chat:
-    #         self.logger.error("No active chat session.")
-    #         return
-#
-        # target_ip, target_port = self.active_chat["target_ip"], self.active_chat["target_port"]
-        # datagram = Datagram(
-        #     datagram_type=2,
-        #     operation=1,  # Chat message operation
-        #     sequence=self.expected_sequence,
-        #     user=self.active_client_connection["username"],
-        #     length=len(message),
-        #     payload=message.encode("utf-8"),
-        # )
-        # self.send_datagram_to_daemon(datagram, target_ip, target_port)
-        # self.logger.info(f"Relayed message to {target_ip}:{target_port}")
+    def handle_chat_datagram(self, datagram: Datagram, address: tuple):
+        try:
+            sender = datagram.user.decode("utf-8")
+            message = datagram.payload.decode("utf-8")
+            self.logger.info(f"Received message from {sender}@{address}: {message}")
+
+            # Forward to connected client
+            if self.active_client_connection:
+                client_conn = self.active_client_connection["conn"]
+                client_conn.sendall(f"{sender}: {message}".encode("utf-8"))
+                self.logger.info(f"Message forwarded to client: {sender}: {message}")
+            else:
+                self.logger.warning("No client connected. Message dropped.")
+        except Exception as e:
+            self.logger.error(f"Error handling chat datagram from {address}: {e}")
 
             
             
@@ -304,26 +302,18 @@ class Daemon:
                             self.send_ack_to_client(client_conn)
                         else:
                             self.logger.error(f"Failed to start chat with daemon at {target_ip}:{7777}.")
-                            self.send_error_to_client(client_conn, "Failed to start chat.")
 
-                    elif message_code == 3:  # Wait for chat
-                        self.logger.info(f"Received wait_chat command from {client_addr}.")
-                        
-                        # Wait for an incoming chat request
-                        if self.wait_for_chat():
-                            self.logger.info("Chat initiated successfully.")
-                            self.send_ack_to_client(client_conn)
-                        else:
-                            self.logger.error("Failed to wait for chat.")
-                            self.send_error_to_client(client_conn, "Failed to wait for chat.")
 
+                    elif message_code == 2:  # Start chat
+                        target_ip = args[0]
+                        self.start_chat_with_daemon(target_ip, 7777)
+                    elif message_code == 4:  # Send message
+                        self.retransmit_message_to_other_daemon(" ".join(args))
                     else:
                         self.logger.warning(f"Unknown message code {message_code} from client {client_addr}.")
-                        self.send_error_to_client(client_conn, "Unknown command.")
-                        
                 except Exception as e:
                     self.logger.error(f"Error handling commands from client {client_addr}: {e}")
-                    self.send_error_to_client(client_conn, "Error processing command.")
+
 
         except Exception as e:
             self.logger.error(f"Error handling commands from client {client_addr}: {e}")
@@ -429,3 +419,18 @@ class Daemon:
         except Exception as e:
             self.logger.error(f"Error while waiting for chat: {e}")
             return False
+
+    def retransmit_message_to_other_daemon(self, message: str):
+        """Relay the client's message to the active chat daemon."""
+        try:
+            if not self.active_chat or self.active_chat["state"] != "started":
+                self.logger.warning("No active chat session. Message cannot be relayed.")
+                return
+
+            target_ip = self.active_chat["target_ip"]
+            target_port = self.active_chat["target_port"]
+
+            self.logger.info(f"Relaying message to daemon {target_ip}:{target_port}: {message}")
+            self.send_chat_datagram(message, target_ip, target_port)
+        except Exception as e:
+            self.logger.error(f"Error relaying message to daemon: {e}")
