@@ -84,10 +84,9 @@ class Client:
     def quit(self):
         """Quit the client."""
         try:
-            self.daemon_tcp_socket.sendall("0".encode("utf-8"))  # Send quit command
+            self.daemon_tcp_socket.sendall("0".encode("utf-8")) # quit
             self.logger.info("Sent quit command to the daemon.")
             
-            # Wait for the socket to close (detect EOF)
             try:
                 data = self.daemon_tcp_socket.recv(1024)
                 if not data:
@@ -103,8 +102,6 @@ class Client:
             self.logger.error(f"Error quitting: {e}")
             sys.exit(1)
 
-
-            
     def run(self):
         """Run the client."""
         self.connect_to_daemon()

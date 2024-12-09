@@ -264,14 +264,13 @@ class Daemon:
 ###########################CLIENT
 
     def handle_incoming_command_from_client(self, client_conn, client_addr):
-        """Handle incoming TCP packets from a client."""
         try:
             self.logger.info(f"Started handling commands from client {client_addr}.")
             
-            while True:  # Persistent listening loop
+            while True:
                 try:
                     data = client_conn.recv(1024).decode("utf-8")
-                    if not data:  # Client closed connection
+                    if not data:
                         self.logger.info(f"Client {client_addr} closed the connection.")
                         break
 
@@ -279,7 +278,7 @@ class Daemon:
                     message_code, *args = data.split()
                     message_code = int(message_code)
 
-                    if message_code == 1:  # username
+                    if message_code == 1: # username
                         username = args[0]
                         self.handle_client_username(username, client_conn)
                         self.logger.info(f"Received username '{username}' from {client_addr}")
@@ -288,7 +287,7 @@ class Daemon:
                     elif message_code == 0:  # quit
                         self.logger.info(f"Received quit command from {client_addr}")
                         self.disconnect_client(client_conn)
-                        break  # Exit loop after disconnecting the client
+                        break 
                     
                     else:
                         self.logger.warning(f"Unknown message code {message_code} from client {client_addr}.")
@@ -310,7 +309,6 @@ class Daemon:
         except Exception as e:
             self.logger.error(f"Failed to send ACK to client: {e}")
             
-            
 
     def handle_client_username(self, username: str, client_conn):
         """Handle the client's username."""
@@ -320,7 +318,6 @@ class Daemon:
         self.send_ack_to_client(client_conn)
         
     def disconnect_client(self, client_conn):
-        """Disconnect a client and clear its state."""
         try:
             self.logger.info(f"Disconnecting client. Current state before disconnection: {self.active_client_connection}")
             with self.lock:
