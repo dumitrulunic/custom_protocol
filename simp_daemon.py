@@ -289,12 +289,42 @@ class Daemon:
                         self.disconnect_client(client_conn)
                         break 
                     
+                    elif message_code == 2:  # Start chat
+                        if len(args) < 1:
+                            self.logger.warning("Start chat command requires a target IP.")
+                            self.send_error_to_client(client_conn, "Missing target IP for start_chat.")
+                            continue
+
+                        target_ip = args[0]
+                        self.logger.info(f"Received start_chat command from {client_addr} to {target_ip}:{7777}")
+
+                        # Attempt to start a chat with the target daemon
+                        if self.start_chat_with_daemon(target_ip, 7777):
+                            self.logger.info(f"Chat successfully started with daemon at {target_ip}:{7777}.")
+                            self.send_ack_to_client(client_conn)
+                        else:
+                            self.logger.error(f"Failed to start chat with daemon at {target_ip}:{7777}.")
+                            self.send_error_to_client(client_conn, "Failed to start chat.")
+
+                    elif message_code == 3:  # Wait for chat
+                        self.logger.info(f"Received wait_chat command from {client_addr}.")
+                        
+                        # Wait for an incoming chat request
+                        if self.wait_for_chat():
+                            self.logger.info("Chat initiated successfully.")
+                            self.send_ack_to_client(client_conn)
+                        else:
+                            self.logger.error("Failed to wait for chat.")
+                            self.send_error_to_client(client_conn, "Failed to wait for chat.")
+
                     else:
                         self.logger.warning(f"Unknown message code {message_code} from client {client_addr}.")
-                
+                        self.send_error_to_client(client_conn, "Unknown command.")
+                        
                 except Exception as e:
-                    self.logger.error(f"Error processing command from {client_addr}: {e}")
-                    break 
+                    self.logger.error(f"Error handling commands from client {client_addr}: {e}")
+                    self.send_error_to_client(client_conn, "Error processing command.")
+
         except Exception as e:
             self.logger.error(f"Error handling commands from client {client_addr}: {e}")
         finally:
@@ -327,4 +357,75 @@ class Daemon:
             self.logger.info("Client connection closed successfully.")
         except Exception as e:
             self.logger.error(f"Error disconnecting client: {e}")
+            
+    def start_chat_with_daemon(self, target_ip: str, target_port: int):
+        """Initiate a chat by performing a three-way handshake with another daemon."""
+        try:
+            self.logger.info(f"Initiating chat with daemon at {target_ip}:{target_port}.")
+            
+            # Use the existing handshake function to perform the handshake
+            self.handshake(target_ip, target_port, is_initiator=True)
+            
+            # Mark the connection as active after successful handshake
+            self.mark_connection_as_active((target_ip, target_port), self.expected_sequence)
+            self.logger.info(f"Chat handshake with {target_ip}:{target_port} completed successfully.")
+            
+            # Increment the expected sequence for the next handshake
+            with self.lock:
+                self.expected_sequence += 1
+            self.active_chat = {
+                "target_ip": target_ip,
+                "target_port": target_port,
+                "state": "started"
+            }
+            return True
+        except Exception as e:
+            self.logger.error(f"Error initiating chat with daemon {target_ip}:{target_port}: {e}")
+            return False
 
+    
+    def wait_for_chat(self):
+        """Wait for an incoming chat initiation (three-way handshake) from another daemon."""
+        try:
+            self.logger.info("Daemon is now waiting for an incoming chat initiation...")
+
+            while self.running:
+                try:
+                    # Receive a datagram from another daemon
+                    data, address = self.socket_daemon.recvfrom(1024)
+                    self.logger.info(f"Received datagram from {address}. Processing...")
+
+                    # Deserialize and process the datagram
+                    datagram = Datagram.from_bytes(data)
+
+                    # If it's a SYN datagram, perform the handshake
+                    if datagram.datagram_type[0] == 1 and datagram.operation[0] == 2:  # Control Datagram and SYN
+                        self.logger.info(f"Received SYN from {address}. Starting handshake...")
+                        
+                        # Use the existing handshake function
+                        self.handshake(
+                            target_ip=address[0], 
+                            target_port=address[1], 
+                            is_initiator=False, 
+                            incoming_datagram=datagram
+                        )
+
+                        # Mark the connection as active
+                        self.mark_connection_as_active(address, datagram.sequence[0])
+                        self.logger.info(f"Chat initiated successfully with {address}.")
+                        self.active_chat = {
+                            "target_ip": address[0],
+                            "target_port": address[1],
+                            "state": "started"
+                        }
+                        return True  # Handshake completed, exit the function
+
+                    else:
+                        self.logger.warning(f"Unexpected datagram type or operation from {address}: {datagram}")
+                
+                except socket.timeout:
+                    # If no datagram is received within the timeout period, continue waiting
+                    continue
+        except Exception as e:
+            self.logger.error(f"Error while waiting for chat: {e}")
+            return False

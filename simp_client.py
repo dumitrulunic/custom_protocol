@@ -10,6 +10,10 @@ class Client:
         # CONNECTION TO DAEMON OPERATIONS
         1: "send_username",
         0: "quit",
+        2: "start_chat",
+        3: "wait_chat",
+        4: "send_message",
+        5: "receive_message",
         
         # # MESSAGE OPERATIONS
         # 3: "send_message",
@@ -60,10 +64,16 @@ class Client:
     def menu(self):
         """Main menu for client interaction."""
         while True:
-            print("\n0. Quit")
+            print("\nq. Quit")
+            print("1. Start Chat")
+            print("2. Wait for Chat")
             choice = input("Enter your choice: ")
-            if choice == "0":
+            if choice == "q":
                 self.quit()
+            elif choice == "1":
+                self.start_chat()
+            elif choice == "2":
+                self.wait_chat()
             else:
                 print("Invalid choice. Please try again.")
 
@@ -80,6 +90,44 @@ class Client:
             self.logger.info(f"Username '{self.username}' sent to the daemon.")
         except Exception as e:
             self.logger.error(f"Error sending username to Daemon: {e}")
+            
+            
+    def start_chat(self):
+        try:
+            target_ip = input("Enter the IP address of the target daemon to start a chat: ").strip()
+            if not target_ip:
+                print("Target IP cannot be empty. Aborting start chat operation.")
+                return
+
+            message = f"2 {target_ip}"  # Command with target IP
+            self.daemon_tcp_socket.sendall(message.encode("utf-8"))  # Send start_chat command
+            self.logger.info(f"Sent start_chat command to the daemon with target IP {target_ip}.")
+
+            if not self.wait_for_ack_from_daemon():
+                print("Failed to start chat.")
+                return
+
+            print(f"Handshake with daemon at {target_ip} completed successfully.")
+        except Exception as e:
+            self.logger.error(f"Error starting chat: {e}")
+            print("An error occurred while starting the chat.")
+
+    def wait_chat(self):
+        try:
+            self.daemon_tcp_socket.sendall("3".encode("utf-8"))  # Command for wait_chat
+            self.logger.info("Sent wait_chat command to the daemon.")
+            
+            if not self.wait_for_ack_from_daemon():
+                print("Failed to wait for chat.")
+                return
+
+            print("Handshake completed successfully. Waiting for messages...")
+        except Exception as e:
+            self.logger.error(f"Error waiting for chat: {e}")
+            print("An error occurred while waiting for the chat.")
+
+
+            
             
     def quit(self):
         """Quit the client."""
