@@ -68,7 +68,7 @@ class Client:
             logger.info(f"Sent start_chat command to daemon for target IP {target_ip}.")
 
             response = self.daemon_tcp_socket.recv(1024).decode("utf-8")
-            if response == "ACCEPTED":
+            if response == "SUCCESS":
                 self.in_chat = True
                 self.is_sender = True
                 print(f"Chat accepted. Chat started with {target_ip}.")
@@ -80,9 +80,51 @@ class Client:
         except Exception as e:
             logger.error(f"Error starting chat: {e}")
 
+    def chat_session(self):
+        """Seamless chat session loop."""
+        try:
+            print("\nChat session started. Type your messages or wait for one.")
+            while self.in_chat:
+                if self.is_sender:
+                    self.send_message()
+                else:
+                    self.wait_for_message()
+        except KeyboardInterrupt:
+            print("\nExiting chat...")
+            self.quit_chat()
+        except Exception as e:
+            logger.error(f"Error during chat session: {e}")
 
-    def wait_for_chat(self):
-        """Wait for an incoming chat request."""
+    def send_message(self):
+        """Send a message to the chat."""
+        try:
+            message = input("Enter your message: ").strip()
+            if message:
+                self.daemon_tcp_socket.sendall(f"4 {message}".encode("utf-8"))
+                logger.info(f"Sent message: {message}")
+        except Exception as e:
+            logger.error(f"Error sending message: {e}")
+
+    def wait_for_message(self):
+        """Wait for a message from the chat."""
+        try:
+            response = self.daemon_tcp_socket.recv(1024).decode("utf-8")
+            if response:
+                print(f"Received message: {response}")
+                logger.info(f"Received message: {response}")
+        except Exception as e:
+            logger.error(f"Error waiting for message: {e}")
+
+    def send_chat_request(self, target_ip: str):
+        """Send a chat request to the target daemon."""
+        try:
+            self.daemon_tcp_socket.sendall(f"2 {target_ip}".encode("utf-8"))
+            logger.info(f"Sent chat request to {target_ip}.")
+        except Exception as e:
+            logger.error(f"Error sending chat request to {target_ip}: {e}")
+
+    def handle_incoming_chat_request(self):
+        """Wait for a chat request and prompt the user to accept or decline."""
         try:
             print("Waiting for an incoming chat request...")
             while True:
@@ -104,37 +146,6 @@ class Client:
                     print(response)
         except Exception as e:
             logger.error(f"Error waiting for chat: {e}")
-        
-    def chat_session(self):
-        """Seamless chat session loop."""
-        try:
-            print("\nChat session started. Type your messages or wait for one.")
-            while self.in_chat:
-                if self.is_sender:
-                    self.send_message()
-                else:
-                    self.wait_for_message()
-        except KeyboardInterrupt:
-            print("\nExiting chat...")
-            self.quit_chat()
-        except Exception as e:
-            logger.error(f"Error during chat session: {e}")
-
-    def handle_incoming_chat_request(self):
-        """Wait for a chat request and prompt the user to accept or decline."""
-        try:
-            print("Waiting for an incoming chat request...")
-            message = self.daemon_tcp_socket.recv(1024).decode("utf-8").strip()
-            print(f"\n{message}")
-            response = input("Enter 'ACCEPT' to join or 'DECLINE' to reject: ").strip().upper()
-            self.daemon_tcp_socket.sendall(response.encode("utf-8"))
-            if response == "ACCEPT":
-                print("Chat request accepted. Waiting for the first message...")
-            elif response == "DECLINE":
-                print("Chat request declined.")
-        except Exception as e:
-            logger.error(f"Error handling incoming chat request: {e}")
-
 
     def quit(self):
         """Quit the client."""

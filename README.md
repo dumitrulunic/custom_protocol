@@ -15,10 +15,10 @@ A lightweight chat protocol built on UDP with reliable messaging using stop-and-
 
 2. Start the daemon:
     ```
-    python simp_daemon.py 
+    python run_daemon.py 
     ```
 
 3. Start the client:
     ```
-    python simp_client.py
+    python run_client.py
     ```
