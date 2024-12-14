@@ -100,33 +100,47 @@ class Client:
 
     def wait_for_chat(self):
         print("Waiting for an incoming chat request...")
-        # Just read messages from daemon until we get a chat request
         while True:
             response = self.daemon_tcp_socket.recv(1024).decode("utf-8")
             if response.startswith("Chat request from"):
                 self.handle_incoming_chat_request(response)
                 break
+            elif response.startswith("Message from"):
+                # We've received a message while waiting for a chat request.
+                # This implies a chat is already in progress.
+                print(response)
+                # Set the chat state and start a chat session immediately.
+                self.in_chat = True
+                self.is_sender = True
+                self.chat_session()
+                break
             else:
-                # Possibly other messages from daemon
                 if response:
                     print(response)
+                else:
+                    # No data, maybe connection closed?
+                    break
+
+
 
     def handle_incoming_chat_request(self, response):
         requester_ip = response.split(":")[1].strip()
         accept = input(f"Do you want to accept the chat request from {requester_ip}? (y/n): ").strip().lower()
         if accept == "y":
             self.daemon_tcp_socket.sendall("3 ACCEPT".encode("utf-8"))
+            self.in_chat = True
+            self.is_sender = False  # Start by waiting for the other side's message
         else:
             self.daemon_tcp_socket.sendall("3 DECLINE".encode("utf-8"))
+            self.in_chat = False
 
         final_response = self.daemon_tcp_socket.recv(1024).decode("utf-8")
         if final_response == "SUCCESS":
             print("Chat accepted. Chat started.")
-            self.in_chat = True
-            self.is_sender = False
             self.chat_session()
         elif final_response == "DECLINED":
             print("Chat declined.")
+            self.in_chat = False
         else:
             print("Unexpected response from daemon:", final_response)
 
@@ -136,24 +150,29 @@ class Client:
             while self.in_chat:
                 if self.is_sender:
                     self.send_message()
+                    continue
                 else:
                     self.wait_for_message()
+                    # print(f"is_sender: {self.is_sender}")
         except KeyboardInterrupt:
             print("\nExiting chat...")
             self.quit_chat()
 
     def wait_for_message(self):
-        print("Waiting for a reply...")
-        response = self.daemon_tcp_socket.recv(1024).decode("utf-8")
-        if response.startswith("Message from"):
-            print(response)  # Print the incoming message
-            self.is_sender = True
-            # Instead of returning and waiting for the loop to iterate again,
-            # call send_message() immediately to prompt the user.
-            print("You can now reply:")
-            self.send_message()  
-        elif not response:
-            print("Chat ended.")
+        print("Waiting for a reply...", flush=True)
+        try:
+            response = self.daemon_tcp_socket.recv(1024).decode("utf-8", errors="replace")
+            if response.startswith("Message from"):
+                print(response, flush=True)
+                self.is_sender = True
+                # print("You can now reply:", flush=True)
+            elif not response:
+                print("Chat ended.", flush=True)
+                self.in_chat = False
+            else:
+                print(f"Unexpected response: {response}", flush=True)
+        except Exception as e:
+            print(f"Error receiving message: {e}", flush=True)
             self.in_chat = False
 
 
@@ -167,8 +186,8 @@ class Client:
             return
         if message:
             self.daemon_tcp_socket.sendall(f"4 {message}".encode("utf-8"))
-            # After sending, wait for the other side's response
-            self.is_sender = False
+        self.is_sender = False  # Set to False after sending the message
+
 
     def quit_chat(self):
         # For simplicity, just send a quit
