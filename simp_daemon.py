@@ -135,6 +135,12 @@ class Daemon:
             elif operation == 2:  # SYN
                 self.logger.info(f"Received SYN from {address}, starting handshake.")
                 self.handshake(address[0], address[1], is_initiator=False, incoming_datagram=datagram)
+                if not self.handle_chat_request(address[0], address[1]):
+                    self.logger.info(f"Chat request from {address[0]} declined by client.")
+                    self.send_control_datagram(1, 0, address[0], address[1], payload="DECLINED")
+                    self.send_control_datagram(8, 0, address[0], address[1])
+                else:
+                    self.logger.info(f"Chat request from {address[0]} accepted by client.")
             elif operation == 4:  # ACK
                 self.logger.info(f"Received ACK from {address}")
                 self.mark_connection_as_active(address, sequence)
@@ -175,13 +181,17 @@ class Daemon:
                 client_conn.sendall(f"{sender}: {message}".encode("utf-8"))
                 self.logger.info(f"Message forwarded to client: {sender}: {message}")
             else:
-                self.logger.warning("No client connected. Message dropped.")
+                # Relay to the connected daemon
+                if self.active_chat and self.active_chat["state"] == "started":
+                    target_ip = self.active_chat["target_ip"]
+                    target_port = self.active_chat["target_port"]
+                    self.send_chat_datagram(message, target_ip, target_port)
+                    self.logger.info(f"Message relayed to daemon at {target_ip}:{target_port}: {message}")
         except Exception as e:
             self.logger.error(f"Error handling chat datagram from {address}: {e}")
 
 
-            
-            
+                            
 
     def mark_connection_as_active(self, address: tuple, sequence: int):
         with self.lock:
@@ -258,19 +268,26 @@ class Daemon:
         return False
     
     def send_chat_datagram(self, message: str, target_ip: str, target_port: int):
+        """Send a chat datagram to another daemon."""
         try:
+            with self.lock:
+                self.expected_sequence = (self.expected_sequence + 1) % 2  # Toggle sequence between 0 and 1
+
             chat_datagram = Datagram(
                 datagram_type=2,
-                operation=1,
+                operation=1,  # CHAT operation
                 sequence=self.expected_sequence,
                 user=self.active_client_connection["username"],
                 length=len(message),
                 payload=message
             )
             self.send_datagram_to_daemon(chat_datagram, target_ip, target_port)
+            self.logger.info(f"Chat datagram sent to {target_ip}:{target_port}: {message}")
         except Exception as e:
             self.logger.error(f"Failed to send chat datagram: {e}")
-    
+
+
+
             
 ###########################CLIENT
 
@@ -280,59 +297,66 @@ class Daemon:
             
             while True:
                 try:
-                    data = client_conn.recv(1024).decode("utf-8")
+                    data = client_conn.recv(1024).decode("utf-8").strip()
                     if not data:
                         self.logger.info(f"Client {client_addr} closed the connection.")
                         break
 
                     self.logger.debug(f"Received data from client {client_addr}: {data}")
+                    
+                    # Handle ACCEPT or DECLINE during chat requests
+                    if data.upper() == "ACCEPT":
+                        self.logger.info(f"Chat request accepted by client {client_addr}.")
+                        # Proceed to handle the chat session
+                        self.active_chat = {
+                            "state": "started",
+                            "target_client": client_addr,
+                        }
+                        client_conn.sendall("SUCCESS".encode("utf-8"))
+                        continue
+                    elif data.upper() == "DECLINE":
+                        self.logger.info(f"Chat request declined by client {client_addr}.")
+                        client_conn.sendall("Chat request declined.".encode("utf-8"))
+                        continue
+                    
+                    # Parse numerical message codes
                     message_code, *args = data.split()
                     message_code = int(message_code)
 
-                    if message_code == 1: # username
+                    if message_code == 1:  # Username
                         username = args[0]
                         self.handle_client_username(username, client_conn)
                         self.logger.info(f"Received username '{username}' from {client_addr}")
-                        self.logger.info(f"Client connection dictionary: {self.active_client_connection}")
-
-                    elif message_code == 0:  # quit
+                    elif message_code == 0:  # Quit
                         self.logger.info(f"Received quit command from {client_addr}")
                         self.disconnect_client(client_conn)
-                        break 
-                    
+                        break
                     elif message_code == 2:  # Start chat
-                        if len(args) < 1:
-                            self.logger.warning("Start chat command requires a target IP.")
-                            self.send_error_to_client(client_conn, "Missing target IP for start_chat.")
-                            continue
-
                         target_ip = args[0]
                         self.logger.info(f"Received start_chat command from {client_addr} to {target_ip}:{7777}")
-
-                        # Attempt to start a chat with the target daemon
                         if self.start_chat_with_daemon(target_ip, 7777):
-                            self.logger.info(f"Chat successfully started with daemon at {target_ip}:{7777}.")
-                            self.send_ack_to_client(client_conn)
-                        else:
-                            self.logger.error(f"Failed to start chat with daemon at {target_ip}:{7777}.")
-
-
-                    elif message_code == 2:  # Start chat
-                        target_ip = args[0]
-                        self.start_chat_with_daemon(target_ip, 7777)
+                            client_conn.sendall("SUCCESS".encode("utf-8"))
                     elif message_code == 4:  # Send message
-                        self.retransmit_message_to_other_daemon(" ".join(args))
+                        # Relay message to the other daemon
+                        message = " ".join(args)
+                        if self.active_chat and self.active_chat["state"] == "started":
+                            target_ip = self.active_chat["target_ip"]
+                            target_port = self.active_chat["target_port"]
+                            self.send_chat_datagram(message, target_ip, target_port)
+                        else:
+                            self.logger.warning("No active chat session. Message cannot be relayed.")
+
                     else:
                         self.logger.warning(f"Unknown message code {message_code} from client {client_addr}.")
-                except Exception as e:
-                    self.logger.error(f"Error handling commands from client {client_addr}: {e}")
-
-
+                except ValueError:
+                    self.logger.error(f"Invalid command format from client {client_addr}: {data}")
         except Exception as e:
             self.logger.error(f"Error handling commands from client {client_addr}: {e}")
         finally:
             self.logger.info(f"Finished handling commands from client {client_addr}.")
             
+    
+
 
     
     def send_ack_to_client(self, client_conn):
@@ -347,6 +371,7 @@ class Daemon:
         """Handle the client's username."""
         self.active_client_connection["username"] = username
         self.active_client_connection["address"] = (self.ip_address, 7778)
+        self.active_client_connection["conn"] = client_conn  # Ensure connection is stored
         self.logger.info(f"Client username set to '{username}'.")
         self.send_ack_to_client(client_conn)
         
@@ -463,25 +488,32 @@ class Daemon:
         except Exception as e:
             self.logger.error(f"Error relaying message to daemon: {e}")
             
-    def handle_chat_request(self, requester_ip, target_ip, target_port):
-        """Handle a chat request and relay the response."""
+    def handle_chat_request(self, requester_ip, requester_port):
+        """Forward chat request to the client and await response."""
         try:
-            # Notify the target client of the incoming chat request
             if "conn" in self.active_client_connection:
                 client_conn = self.active_client_connection["conn"]
                 message = f"Chat request from: {requester_ip}. Type 'ACCEPT' to join or 'DECLINE' to reject."
+                
+                # Send chat request to client
                 client_conn.sendall(message.encode("utf-8"))
-                self.logger.info(f"Chat request sent to client at {target_ip}:{target_port}.")
+                self.logger.info(f"Chat request sent to client for requester {requester_ip}:{requester_port}.")
 
-                # Wait for the client's response
+                # Wait for client's response
                 response = client_conn.recv(1024).decode("utf-8").strip().upper()
                 if response == "ACCEPT":
-                    self.logger.info(f"Chat request accepted by client at {target_ip}.")
-                    self.send_control_datagram(1, 0, requester_ip, 7777, payload="ACCEPTED")
+                    self.logger.info(f"Chat request accepted by client.")
+                    self.send_control_datagram(4, 0, requester_ip, requester_port, payload="ACCEPTED")
+                    self.active_chat = {
+                        "target_ip": requester_ip,
+                        "target_port": requester_port,
+                        "state": "started",
+                    }
                     return True
                 elif response == "DECLINE":
-                    self.logger.info(f"Chat request declined by client at {target_ip}.")
-                    self.send_control_datagram(1, 0, requester_ip, 7777, payload="DECLINED")
+                    self.logger.info(f"Chat request declined by client.")
+                    self.send_control_datagram(1, 0, requester_ip, requester_port, payload="DECLINED")
+                    self.send_control_datagram(8, 0, requester_ip, requester_port)
                     return False
             else:
                 self.logger.warning("No client connected to handle the chat request.")
@@ -489,6 +521,12 @@ class Daemon:
         except Exception as e:
             self.logger.error(f"Error handling chat request: {e}")
             return False
+
+
+
+
+
+
 
 
     def start_chat_with_daemon(self, target_ip: str, target_port: int):
@@ -499,22 +537,19 @@ class Daemon:
             # Perform handshake
             self.handshake(target_ip, target_port, is_initiator=True)
             
-            # Notify the target client and wait for their response
-            if self.handle_chat_request(self.ip_address, target_ip, target_port):
-                self.logger.info(f"Chat accepted by {target_ip}. Chat started.")
-                self.active_chat = {
-                    "target_ip": target_ip,
-                    "target_port": target_port,
-                    "state": "started"
-                }
-                return True
-            else:
-                self.logger.info(f"Chat declined by {target_ip}.")
-                return False
+            # Mark the chat as started
+            self.active_chat = {
+                "target_ip": target_ip,
+                "target_port": target_port,
+                "state": "started",
+            }
+            self.logger.info(f"Chat handshake with {target_ip}:{target_port} completed successfully.")
+            return True
         except Exception as e:
             self.logger.error(f"Error initiating chat with daemon {target_ip}:{target_port}: {e}")
             return False
 
 
 
-            
+
+                
