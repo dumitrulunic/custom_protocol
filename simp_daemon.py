@@ -132,32 +132,25 @@ class Daemon:
                 self.send_control_datagram(1, 0, ip, port, "User already in another chat")
                 self.send_control_datagram(8, 0, ip, port)  # FIN
             else:
-                # RYN+ACK
-                self.send_control_datagram(6, sequence, ip, port)
+                # Send chat request to client
+                self.active_chat = {"target_ip": ip, "target_port": port, "state": "handshake_complete"}
+                self.notify_client_chat_request(ip)
 
         elif operation == 4:  # ACK
             self.logger.info(f"Received ACK from {address}")
             self.mark_connection_as_active(address, sequence)
             if self.active_chat.get("target_ip") is None:
-                self.active_chat = {
-                    "target_ip": ip,
-                    "target_port": port,
-                    "state": "started"
-                }
-                self.logger.info(f"Chat session started with {ip}:{port}")
+                self.active_chat["target_ip"] = ip
+                self.active_chat["target_port"] = port
+                self.active_chat["state"] = "started"
 
             if (ip, port) in self.handshake_status and self.handshake_status[(ip, port)] == "SYN_ACK_RECEIVED":
-                self.handshake_status[(ip, port)] = "HANDSHAKE_COMPLETE"
-                self.active_chat = {
-                    "target_ip": ip,
-                    "target_port": port,
-                    "state": "handshake_complete"
-                }
-                self.notify_client_chat_request(ip)
+                self.handshake_status[(ip, port)] = "handshake_complete"
 
         elif operation == 6:  # SYN+ACK
             self.logger.info(f"Received SYN+ACK from {address}")
             if (ip, port) in self.handshake_status and self.handshake_status[(ip, port)] == "SYN_SENT":
+                self.send_control_datagram(4, sequence, ip, port)  # ACK
                 self.handshake_status[(ip, port)] = "SYN_ACK_RECEIVED"
 
         elif operation == 8:  # FIN
@@ -268,7 +261,8 @@ class Daemon:
         logger.info(f"Active chat: {self.active_chat}")
         if "conn" in self.active_client_connection and self.active_client_connection.get("username"):
             client_conn = self.active_client_connection["conn"]
-            message = f"Chat request from: {requester_ip}. Type 'ACCEPT' to join or 'DECLINE' to reject."
+            requester_username = self.active_client_connection.get("username", "Unknown")
+            message = f"Chat request from: {requester_ip}:{requester_username}"
             client_conn.sendall(message.encode("utf-8"))
             self.logger.info("Notified client about incoming chat request.")
         else:
@@ -401,7 +395,7 @@ class Daemon:
                 self.active_chat["state"] = "started"
             else:
                 if "conn" in self.active_client_connection:
-                    self.active_client_connection["conn"].sendall(b"DECLINED")
+                    self.active_client_connection["conn"].sendall(b"DECLINED") # HERE IS PROBLEM
 
 
 
@@ -429,7 +423,9 @@ class Daemon:
                     return True
         time.sleep(0.1)
 
-        self.logger.warning("Handshake timed out.")
+
+
+        self.logger.warning("Handshake timed out.") # HERE IS A PROBLEM BECAUSE OF THIS I HAVE A PROBLEM LOOK UP ^^^
         return False
 
 

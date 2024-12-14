@@ -2,6 +2,7 @@ import socket
 import sys
 from logger import logger
 
+
 class Client:
     def __init__(self, daemon_ip: str, daemon_port=7778):
         self.daemon_ip = daemon_ip
@@ -85,9 +86,9 @@ class Client:
             elif response.startswith("Chat request from"):
                 self.handle_incoming_chat_request(response)
                 break
-            elif response == "DECLINED":
-                print("Chat request declined.")
-                break
+            # elif response == "DECLINED":
+            #     print("Chat request declined.")
+            #     break
             elif response.startswith("Message from"):
                 print(response)
                 self.is_sender = True
@@ -128,23 +129,30 @@ class Client:
         '''
         Handle incoming chat request
         '''
-        requester_ip = response.split(":")[1].strip()
-        accept = input(f"Do you want to accept the chat request from {requester_ip}? (y/n): ").strip().lower()
-        if accept == "y":
+        parts = response.split(":")
+        requester_ip = parts[1].strip()
+        requester_username = parts[2].strip() if len(parts) > 2 else "Unknown"
+        accept = input(f"Chat request from: {requester_ip}? (ACCEPT/DECLINE): ").upper()
+        if accept == "ACCEPT":
             self.daemon_tcp_socket.sendall("3 ACCEPT".encode("utf-8"))
             self.in_chat = True
-            self.is_sender = False 
+            self.is_sender = True
         else:
             self.daemon_tcp_socket.sendall("3 DECLINE".encode("utf-8"))
             self.in_chat = False
+            self.is_sender = False
+            print("Chat request declined.")
+            # And terminate the daemon connection and exit
+            self.menu()
 
         final_response = self.daemon_tcp_socket.recv(1024).decode("utf-8")
         if final_response == "SUCCESS":
-            print("Chat accepted. Chat started.")
+            print("Chat accepted.")
             self.chat_session()
         elif final_response == "DECLINED":
             print("Chat declined.")
             self.in_chat = False
+
         else:
             print("Unexpected response from daemon:", final_response)
 
