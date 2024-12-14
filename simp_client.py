@@ -11,10 +11,8 @@ class Client:
         self.in_chat = False
         self.is_sender = False
         self.daemon_tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.logger = logger
 
     def connect_to_daemon(self):
-        """Connect to the daemon."""
         try:
             self.daemon_tcp_socket.connect((self.daemon_ip, self.daemon_port))
             self.connected = True
@@ -24,21 +22,19 @@ class Client:
             sys.exit(1)
 
     def send_username(self):
-        """Send the username to the daemon."""
-        try:
-            self.username = input("Enter your username: ").strip()
-            if not self.username:
-                print("Username cannot be empty. Please restart the client.")
-                sys.exit(1)
-            self.daemon_tcp_socket.sendall(f"1 {self.username}".encode("utf-8"))
-            logger.info(f"Username '{self.username}' sent to the daemon.")
+        self.username = input("Enter your username: ").strip()
+        if not self.username:
+            print("Username cannot be empty. Please restart the client.")
+            sys.exit(1)
+        self.daemon_tcp_socket.sendall(f"1 {self.username}".encode("utf-8"))
+        response = self.daemon_tcp_socket.recv(1024).decode("utf-8")
+        if response == "SUCCESS":
             print("Username sent successfully.")
-        except Exception as e:
-            logger.error(f"Error sending username to daemon: {e}")
+        else:
+            print("Failed to set username.")
             sys.exit(1)
 
     def menu(self):
-        """Main menu for client interaction."""
         while True:
             print("\nMain Menu:")
             print("1. Start Chat")
@@ -55,143 +51,157 @@ class Client:
             else:
                 print("Invalid choice. Please try again.")
 
-
     def start_chat(self):
-        """Start a chat by providing the target daemon's IP."""
-        try:
-            target_ip = input("Enter the IP address of the target daemon: ").strip()
-            if not target_ip:
-                print("Target IP cannot be empty.")
-                return
+        target_ip = input("Enter the IP address of the target daemon: ").strip()
+        if not target_ip:
+            print("Target IP cannot be empty.")
+            return
 
-            self.daemon_tcp_socket.sendall(f"2 {target_ip}".encode("utf-8"))
-            logger.info(f"Sent start_chat command to daemon for target IP {target_ip}.")
+        self.daemon_tcp_socket.sendall(f"2 {target_ip}".encode("utf-8"))
 
+        # We now wait for either a SUCCESS (chat accepted) or a message from daemon
+        # indicating we must wait for request acceptance.
+        # The daemon will send us a "Chat request from..." if it needs acceptance,
+        # or "User already in another chat" or "DECLINED" if failed.
+        while True:
             response = self.daemon_tcp_socket.recv(1024).decode("utf-8")
             if response == "SUCCESS":
+                print(f"Chat started with {target_ip}.")
                 self.in_chat = True
                 self.is_sender = True
-                print(f"Chat request sent to {target_ip}. Enter your first message:")
                 self.chat_session()
+                break
+            elif response == "User already in another chat":
+                print(response)
+                break
+            elif response.startswith("Chat request from"):
+                # This would happen if remote needs acceptance, 
+                # but we initiated the chat, so presumably we've done the handshake already.
+                # If this happens, handle similarly as wait_for_chat scenario.
+                self.handle_incoming_chat_request(response)
+                break
             elif response == "DECLINED":
-                print(f"Chat request declined by {target_ip}.")
+                print("Chat request declined.")
+                break
+            elif response.startswith("Message from"):
+                # Received first message from other side
+                print(response)
+                self.is_sender = True
+                self.in_chat = True
+                self.chat_session()
+                break
             else:
-                print("Failed to start chat.")
-        except Exception as e:
-            logger.error(f"Error starting chat: {e}")
-
+                # Continue waiting for a meaningful response
+                if response:
+                    print(response)
+                else:
+                    # no meaningful response
+                    break
 
     def wait_for_chat(self):
-        """Wait for an incoming chat request."""
-        try:
-            print("Waiting for an incoming chat request...")
-            while True:
-                # Receive message from daemon
-                response = self.daemon_tcp_socket.recv(1024).decode("utf-8").strip()
-                if response.startswith("Chat request from"):
-                    print(f"\n{response}")
-                    
-                    # Prompt user to accept or decline
-                    while True:
-                        choice = input("Do you want to accept the chat? (y/n): ").strip().lower()
-                        if choice in ["y", "n"]:
-                            break
-                        print("Invalid input. Please type 'y' for accept or 'n' for decline.")
-                    
-                    # Send response to daemon
-                    if choice == "y":
-                        self.daemon_tcp_socket.sendall("ACCEPT".encode("utf-8"))
-                        print("Chat accepted. Waiting for the first message...")
-                        self.in_chat = True
-                        self.is_sender = False
-                        self.chat_session()  # Enter chat session
-                        break
-                    else:
-                        self.daemon_tcp_socket.sendall("DECLINE".encode("utf-8"))
-                        print("Chat declined. Returning to waiting state.")
-                else:
+        print("Waiting for an incoming chat request...")
+        while True:
+            response = self.daemon_tcp_socket.recv(1024).decode("utf-8")
+            if response.startswith("Chat request from"):
+                self.handle_incoming_chat_request(response)
+                break
+            elif response.startswith("Message from"):
+                # We've received a message while waiting for a chat request.
+                # This implies a chat is already in progress.
+                print(response)
+                # Set the chat state and start a chat session immediately.
+                self.in_chat = True
+                self.is_sender = True
+                self.chat_session()
+                break
+            else:
+                if response:
                     print(response)
-        except Exception as e:
-            logger.error(f"Error while waiting for chat: {e}")
-            
-    def wait_for_message(self):
-        """Wait for an incoming message from the daemon."""
-        try:
-            message = self.daemon_tcp_socket.recv(1024).decode("utf-8").strip()
-            if message:
-                print(f"\n{message}")
-                self.logger.info(f"Message received from daemon: {message}")
-                self.is_sender = True  # Switch the state to allow sending the next message
-        except Exception as e:
-            self.logger.error(f"Error receiving message from daemon: {e}")
+                else:
+                    # No data, maybe connection closed?
+                    break
 
 
 
+    def handle_incoming_chat_request(self, response):
+        requester_ip = response.split(":")[1].strip()
+        accept = input(f"Do you want to accept the chat request from {requester_ip}? (y/n): ").strip().lower()
+        if accept == "y":
+            self.daemon_tcp_socket.sendall("3 ACCEPT".encode("utf-8"))
+            self.in_chat = True
+            self.is_sender = False  # Start by waiting for the other side's message
+        else:
+            self.daemon_tcp_socket.sendall("3 DECLINE".encode("utf-8"))
+            self.in_chat = False
 
+        final_response = self.daemon_tcp_socket.recv(1024).decode("utf-8")
+        if final_response == "SUCCESS":
+            print("Chat accepted. Chat started.")
+            self.chat_session()
+        elif final_response == "DECLINED":
+            print("Chat declined.")
+            self.in_chat = False
+        else:
+            print("Unexpected response from daemon:", final_response)
 
-        
     def chat_session(self):
-        """Seamless chat session loop."""
+        print("\nChat session started. Type your messages or wait for one.")
         try:
-            print("\nChat session started. Type your messages or wait for one.")
             while self.in_chat:
                 if self.is_sender:
                     self.send_message()
+                    continue
                 else:
                     self.wait_for_message()
+                    # print(f"is_sender: {self.is_sender}")
         except KeyboardInterrupt:
             print("\nExiting chat...")
             self.quit_chat()
-        except Exception as e:
-            logger.error(f"Error during chat session: {e}")
-            
-    def send_message(self):
-        """Send a message to the daemon."""
+
+    def wait_for_message(self):
+        print("Waiting for a reply...", flush=True)
         try:
-            message = input("Enter your message: ").strip()
-            if not message:
-                print("Message cannot be empty. Please try again.")
-                return
-
-            # Send the message to the daemon
-            self.daemon_tcp_socket.sendall(f"4 {message}".encode("utf-8"))
-            self.logger.info(f"Message sent to daemon: {message}")
-            self.is_sender = False  # Toggle the sender state
+            response = self.daemon_tcp_socket.recv(1024).decode("utf-8", errors="replace")
+            if response.startswith("Message from"):
+                print(response, flush=True)
+                self.is_sender = True
+                # print("You can now reply:", flush=True)
+            elif not response:
+                print("Chat ended.", flush=True)
+                self.in_chat = False
+            else:
+                print(f"Unexpected response: {response}", flush=True)
         except Exception as e:
-            self.logger.error(f"Error sending message to daemon: {e}")
+            print(f"Error receiving message: {e}", flush=True)
+            self.in_chat = False
 
 
 
-    # def handle_incoming_chat_request(self):
-    #     """Wait for a chat request and prompt the user to accept or decline."""
-    #     try:
-    #         print("Waiting for an incoming chat request...")
-    #         message = self.daemon_tcp_socket.recv(1024).decode("utf-8").strip()
-    #         print(f"\n{message}")
-    #         response = input("Enter 'ACCEPT' to join or 'DECLINE' to reject: ").strip().upper()
-    #         self.daemon_tcp_socket.sendall(response.encode("utf-8"))
-    #         if response == "ACCEPT":
-    #             print("Chat request accepted. Waiting for the first message...")
-    #         elif response == "DECLINE":
-    #             print("Chat request declined.")
-    #     except Exception as e:
-    #         logger.error(f"Error handling incoming chat request: {e}")
 
+
+    def send_message(self):
+        message = input("Enter your message: ").strip()
+        if message.lower() == "quit":
+            self.quit_chat()
+            return
+        if message:
+            self.daemon_tcp_socket.sendall(f"4 {message}".encode("utf-8"))
+        self.is_sender = False  # Set to False after sending the message
+
+
+    def quit_chat(self):
+        # For simplicity, just send a quit
+        self.in_chat = False
+        self.daemon_tcp_socket.sendall("0".encode("utf-8"))
+        self.daemon_tcp_socket.close()
+        sys.exit(0)
 
     def quit(self):
-        """Quit the client."""
-        try:
-            self.daemon_tcp_socket.sendall("0".encode("utf-8"))
-            logger.info("Sent quit command to daemon.")
-            self.daemon_tcp_socket.close()
-            sys.exit(0)
-        except Exception as e:
-            logger.error(f"Error quitting client: {e}")
-            sys.exit(1)
+        self.daemon_tcp_socket.sendall("0".encode("utf-8"))
+        self.daemon_tcp_socket.close()
+        sys.exit(0)
 
     def run(self):
-        """Run the client."""
         self.connect_to_daemon()
         self.send_username()
         self.menu()
-
