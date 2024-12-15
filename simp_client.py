@@ -2,7 +2,6 @@ import socket
 import sys
 from logger import logger
 
-
 class Client:
     def __init__(self, daemon_ip: str, daemon_port=7778):
         self.daemon_ip = daemon_ip
@@ -25,6 +24,7 @@ class Client:
             logger.error(f"Failed to connect to daemon: {e}")
             sys.exit(1)
 
+
     def send_username(self):
         '''
         Send the username to the daemon
@@ -40,6 +40,7 @@ class Client:
         else:
             print("Failed to set username.")
             sys.exit(1)
+
 
     def menu(self):
         '''
@@ -61,10 +62,8 @@ class Client:
             else:
                 print("Invalid choice. Please try again.")
 
+    
     def start_chat(self):
-        '''
-        Start a chat with another user
-        '''
         target_ip = input("Enter the IP address of the target daemon: ").strip()
         if not target_ip:
             print("Target IP cannot be empty.")
@@ -74,25 +73,27 @@ class Client:
 
         while True:
             response = self.daemon_tcp_socket.recv(1024).decode("utf-8")
-            if response == "SUCCESS":
-                print(f"Chat started with {target_ip}.")
+
+            if response.startswith("DECLINED"):
+                print("Chat declined or request timed out. Returning to main menu.")
+                break
+            elif response.startswith("SUCCESS"):
+                print("Chat started successfully!")
                 self.in_chat = True
                 self.is_sender = True
                 self.chat_session()
                 break
+
             elif response == "User already in another chat":
                 print(response)
                 break
             elif response.startswith("Chat request from"):
                 self.handle_incoming_chat_request(response)
                 break
-            # elif response == "DECLINED":
-            #     print("Chat request declined.")
-            #     break
             elif response.startswith("Message from"):
                 print(response)
-                self.is_sender = True
                 self.in_chat = True
+                self.is_sender = True
                 self.chat_session()
                 break
             else:
@@ -100,61 +101,59 @@ class Client:
                     print(response)
                 else:
                     break
-
+                
+                
     def wait_for_chat(self):
-        '''
-        Wait for an incoming chat request
-        '''
         print("Waiting for an incoming chat request...")
         while True:
             response = self.daemon_tcp_socket.recv(1024).decode("utf-8")
-            if response.startswith("Chat request from"):
-                self.handle_incoming_chat_request(response)
+            if response.startswith("DECLINED"):
+                print("Chat declined or request timed out. Returning to main menu.")
                 break
-            elif response.startswith("Message from"):
-                print(response)
+            elif response.startswith("SUCCESS"):
+                print("Chat started successfully!")
                 self.in_chat = True
-                self.is_sender = True
+                self.is_sender = False
                 self.chat_session()
+                break
+            elif response.startswith("Chat request from"):
+                self.handle_incoming_chat_request(response)
                 break
             else:
                 if response:
                     print(response)
                 else:
                     break
-
 
 
     def handle_incoming_chat_request(self, response):
         '''
         Handle incoming chat request
         '''
-        parts = response.split(":")
-        requester_ip = parts[1].strip()
-        requester_username = parts[2].strip() if len(parts) > 2 else "Unknown"
-        accept = input(f"Chat request from: {requester_ip}? (ACCEPT/DECLINE): ").upper()
-        if accept == "ACCEPT":
+        requester_info = response.split(".")[0]
+        requester_ip = requester_info.split(":")[1].strip()
+
+        accept = input(f"Do you want to accept the chat request from {requester_ip}? (y/n): ").strip().lower()
+        if accept == "y":
             self.daemon_tcp_socket.sendall("3 ACCEPT".encode("utf-8"))
             self.in_chat = True
-            self.is_sender = True
+            self.is_sender = False 
         else:
             self.daemon_tcp_socket.sendall("3 DECLINE".encode("utf-8"))
             self.in_chat = False
-            self.is_sender = False
-            print("Chat request declined.")
-            # And terminate the daemon connection and exit
-            self.menu()
 
         final_response = self.daemon_tcp_socket.recv(1024).decode("utf-8")
-        if final_response == "SUCCESS":
-            print("Chat accepted.")
+
+        if final_response.startswith("SUCCESS"):
+            print("Chat accepted. Chat started.")
+            self.in_chat = True
             self.chat_session()
-        elif final_response == "DECLINED":
+        elif final_response.startswith("DECLINED"):
             print("Chat declined.")
             self.in_chat = False
-
         else:
             print("Unexpected response from daemon:", final_response)
+
 
     def chat_session(self):
         '''
@@ -170,6 +169,7 @@ class Client:
         except KeyboardInterrupt:
             print("\nExiting chat...")
             self.quit_chat()
+
 
     def wait_for_message(self):
         '''
@@ -189,9 +189,6 @@ class Client:
         except Exception as e:
             print(f"Error receiving message: {e}", flush=True)
             self.in_chat = False
-
-
-
 
 
     def send_message(self):
@@ -216,6 +213,7 @@ class Client:
         self.daemon_tcp_socket.close()
         sys.exit(0)
 
+
     def quit(self):
         '''
         Quit the client
@@ -223,6 +221,7 @@ class Client:
         self.daemon_tcp_socket.sendall("0".encode("utf-8"))
         self.daemon_tcp_socket.close()
         sys.exit(0)
+
 
     def run(self):
         '''

@@ -13,9 +13,9 @@ class Daemon:
         self.socket_daemon = None
         self.socket_client = None
 
-        self.active_daemon_connection = {}  # (ip, port) -> {"state": "connected", "sequence": ...}
-        self.active_client_connection = {}  # Store {"username": ..., "conn": ..., ...}
-        self.active_chat = {}               # {"target_ip": ..., "target_port": ..., "state": ...}
+        self.active_daemon_connection = {} # {"target_ip": ..., "target_port": ..., "state": ...}
+        self.active_client_connection = {} # {"conn": ..., "username": ..., "address": ...}
+        self.active_chat = {} # {"target_ip": ..., "target_port": ..., "state": ...}
         
         self.handshake_status = {}
 
@@ -41,6 +41,7 @@ class Daemon:
             self.logger.info("Daemon shutting down via KeyboardInterrupt.")
             self.stop()
 
+
     def stop(self):
         '''
         Stop the daemon and close the sockets.
@@ -52,6 +53,7 @@ class Daemon:
         if self.socket_client:
             self.socket_client.close()
             self.logger.info("Daemon TCP socket closed.")
+
 
     def listen_to_daemon_packets(self):
         try:
@@ -70,6 +72,7 @@ class Daemon:
         finally:
             if self.socket_daemon:
                 self.socket_daemon.close()
+
 
     def listen_to_client_packets(self):
         '''
@@ -94,6 +97,7 @@ class Daemon:
             if self.socket_client:
                 self.socket_client.close()
 
+
     def handle_incoming_datagram_from_daemon(self, data: bytes, address: tuple):
         '''
         Handle incoming datagram from the daemon.
@@ -112,6 +116,7 @@ class Daemon:
                 self.logger.error(f"Invalid datagram type: {datagram_type}")
         except Exception as e:
             self.logger.error(f"Failed to handle incoming datagram from daemon {address}: {e}")
+
 
     def handle_control_datagram(self, datagram: Datagram, address: tuple):
         '''
@@ -132,17 +137,22 @@ class Daemon:
                 self.send_control_datagram(1, 0, ip, port, "User already in another chat")
                 self.send_control_datagram(8, 0, ip, port)  # FIN
             else:
-                # Send chat request to client
                 self.active_chat = {"target_ip": ip, "target_port": port, "state": "handshake_complete"}
                 self.notify_client_chat_request(ip)
+
 
         elif operation == 4:  # ACK
             self.logger.info(f"Received ACK from {address}")
             self.mark_connection_as_active(address, sequence)
+
             if self.active_chat.get("target_ip") is None:
                 self.active_chat["target_ip"] = ip
                 self.active_chat["target_port"] = port
+
+            if self.active_chat.get("state") == "handshake_complete":
                 self.active_chat["state"] = "started"
+                if "conn" in self.active_client_connection:
+                    self.active_client_connection["conn"].sendall(b"SUCCESS - Chat started.")
 
             if (ip, port) in self.handshake_status and self.handshake_status[(ip, port)] == "SYN_ACK_RECEIVED":
                 self.handshake_status[(ip, port)] = "handshake_complete"
@@ -158,10 +168,14 @@ class Daemon:
             self.send_control_datagram(4, sequence, ip, port)
             self.mark_connection_as_inactive(address)
             if self.active_chat.get("target_ip") == ip and self.active_chat.get("target_port") == port:
+                if self.active_chat.get("state") in ["handshake_complete", "SYN_SENT"]:
+                    if "conn" in self.active_client_connection:
+                        self.active_client_connection["conn"].sendall(b"DECLINED")
                 self.active_chat.clear()
 
         else:
             self.logger.error(f"Unknown control operation: {operation}")
+
 
     def handle_chat_datagram(self, datagram: Datagram, address: tuple):
         logger.info(f"Active chat: {self.active_chat}")
@@ -202,6 +216,7 @@ class Daemon:
         logger.info(f"Active chat: {self.active_chat}")
         return self.active_chat.get("state") in ["handshake_complete", "started"]
 
+
     def mark_connection_as_active(self, address: tuple, sequence: int):
         '''
         Mark the connection with the daemon as active.
@@ -214,6 +229,7 @@ class Daemon:
             }
             self.logger.info(f"Connection with {address} established.")
 
+
     def mark_connection_as_inactive(self, address: tuple):
         '''
         Mark the connection with the daemon as inactive.
@@ -223,6 +239,7 @@ class Daemon:
             if address in self.active_daemon_connection:
                 del self.active_daemon_connection[address]
                 self.logger.info(f"Connection with {address} terminated.")
+
 
     def send_control_datagram(self, operation: int, sequence: int, target_ip: str, target_port: int, payload: str = ""):
         ''''
@@ -242,6 +259,7 @@ class Daemon:
         except Exception as e:
             self.logger.error(f"Failed to send control datagram: {e}")
 
+
     def send_datagram_to_daemon(self, datagram: Datagram, ip: str, port: int = 7777):
         '''
         Send a datagram to the daemon.
@@ -253,6 +271,7 @@ class Daemon:
             self.logger.info(f"Sent datagram to daemon {ip}:{port}")
         except Exception as e:
             self.logger.error(f"Failed to send datagram to daemon {ip}:{port}: {e}")
+
 
     def notify_client_chat_request(self, requester_ip):
         '''
@@ -268,6 +287,7 @@ class Daemon:
         else:
             self.logger.info("No client connected to handle chat request.")
             self.send_control_datagram(8, 0, requester_ip, 7777)  # FIN
+
 
     def handle_incoming_command_from_client(self, client_conn, client_addr):
         '''
@@ -330,6 +350,7 @@ class Daemon:
         finally:
             self.logger.info(f"Finished handling commands from client {client_addr}.")
 
+
     def handle_client_username(self, username: str, client_conn):
         '''
         Handle the username sent by the client.
@@ -340,10 +361,8 @@ class Daemon:
         client_conn.sendall(b"SUCCESS")
         self.logger.info(f"Client username set to '{username}'.")
 
+
     def handle_client_chat_decision(self, decision, client_conn):
-        '''
-        Handle the chat request response from the client.
-        '''
         logger.info(f"Active chat: {self.active_chat}")
         if not self.active_chat or self.active_chat.get("state") != "handshake_complete":
             self.logger.warning("No pending chat request.")
@@ -354,14 +373,18 @@ class Daemon:
 
         if decision == "ACCEPT":
             self.logger.info("Client accepted the chat request.")
-            self.send_control_datagram(4, 0, requester_ip, requester_port)
-            self.active_chat["state"] = "started"
-            client_conn.sendall(b"SUCCESS")
+            # Instead of sending ACK(4) right away, send SYN+ACK(6) to match the expected sequence
+            self.send_control_datagram(6, 0, requester_ip, requester_port)  # SYN+ACK
+            # Don't change state yet. Wait until we get an ACK(4) from the initiator before concluding handshake.
         else:
             self.logger.info("Client declined the chat request.")
-            self.send_control_datagram(8, 0, requester_ip, requester_port)
-            client_conn.sendall(b"DECLINED")
+            self.send_control_datagram(8, 0, requester_ip, requester_port)  # FIN
+            client_conn.sendall(b"DECLINED - Back to menu.")
             self.active_chat.clear()
+
+            with self.lock:
+                if (requester_ip, requester_port) in self.handshake_status:
+                    del self.handshake_status[(requester_ip, requester_port)]
 
 
     def disconnect_client(self, client_conn):
@@ -375,10 +398,8 @@ class Daemon:
         client_conn.close()
         self.logger.info("Client disconnected.")
 
+
     def start_chat_with_daemon(self, target_ip: str, target_port: int, is_initiator: bool = False):
-        '''
-        Start a chat session with the daemon.
-        '''
         logger.info(f"Active chat: {self.active_chat}")
         if self.is_already_in_chat():
             self.logger.info("User already in another chat. Cannot start a new one.")
@@ -391,18 +412,13 @@ class Daemon:
             if success:
                 self.logger.info("Handshake complete. Chat session started.")
                 if "conn" in self.active_client_connection:
-                    self.active_client_connection["conn"].sendall(b"SUCCESS")
+                    self.active_client_connection["conn"].sendall(b"SUCCESS - Chat started.")
                 self.active_chat["state"] = "started"
             else:
-                if "conn" in self.active_client_connection:
-                    self.active_client_connection["conn"].sendall(b"DECLINED") # HERE IS PROBLEM
-
+                self.logger.info("Handshake failed or timed out.")
 
 
     def handshake_initiator(self, target_ip: str, target_port: int, timeout=5):
-        '''
-        Perform the handshake as the initiator.
-        '''
         logger.info(f"Active chat: {self.active_chat}")
         self.handshake_status[(target_ip, target_port)] = "SYN_SENT"
         self.send_control_datagram(2, 0, target_ip, target_port)  # SYN
@@ -421,11 +437,19 @@ class Daemon:
                         "state": "handshake_complete"
                     }
                     return True
-        time.sleep(0.1)
+            time.sleep(0.1)
+
+        self.logger.warning("Handshake timed out.")
+        if "conn" in self.active_client_connection:
+            self.active_client_connection["conn"].sendall(b"DECLINED - Handshake timed out, back to menu.")
 
 
+        # Revert to Idle state
+        self.active_chat.clear()
+        with self.lock:
+            if (target_ip, target_port) in self.handshake_status:
+                del self.handshake_status[(target_ip, target_port)]
 
-        self.logger.warning("Handshake timed out.") # HERE IS A PROBLEM BECAUSE OF THIS I HAVE A PROBLEM LOOK UP ^^^
         return False
 
 
@@ -458,3 +482,17 @@ class Daemon:
             payload=message
         )
         self.send_datagram_to_daemon(chat_datagram, target_ip, target_port)
+        
+        
+    def notify_client_chat_request(self, requester_ip):
+        logger.info(f"Active chat: {self.active_chat}")
+        if "conn" in self.active_client_connection and self.active_client_connection.get("username"):
+            client_conn = self.active_client_connection["conn"]
+            requester_username = self.active_client_connection.get("username", "Unknown")
+            message = f"Chat request from: {requester_ip}"
+            client_conn.sendall(message.encode("utf-8"))
+            self.logger.info("Notified client about incoming chat request.")
+        else:
+            self.logger.info("No client connected to handle chat request.")
+            self.send_control_datagram(8, 0, requester_ip, 7777)  # FIN
+            self.active_chat.clear()
