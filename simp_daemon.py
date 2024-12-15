@@ -167,11 +167,18 @@ class Daemon:
             self.logger.info(f"Received FIN from {address}, sending ACK and closing.")
             self.send_control_datagram(4, sequence, ip, port)
             self.mark_connection_as_inactive(address)
+
             if self.active_chat.get("target_ip") == ip and self.active_chat.get("target_port") == port:
-                if self.active_chat.get("state") in ["handshake_complete", "SYN_SENT"]:
-                    if "conn" in self.active_client_connection:
-                        self.active_client_connection["conn"].sendall(b"DECLINED")
+                if "conn" in self.active_client_connection:
+                    self.active_client_connection["conn"].sendall(b"CHAT_ENDED")
+
+                with self.lock:
+                    if (ip, port) in self.handshake_status:
+                        del self.handshake_status[(ip, port)]
+
                 self.active_chat.clear()
+
+
 
         else:
             self.logger.error(f"Unknown control operation: {operation}")
@@ -274,19 +281,19 @@ class Daemon:
 
 
     def notify_client_chat_request(self, requester_ip):
-        '''
-        Notify the client about an incoming chat request.
-        '''
         logger.info(f"Active chat: {self.active_chat}")
         if "conn" in self.active_client_connection and self.active_client_connection.get("username"):
             client_conn = self.active_client_connection["conn"]
-            requester_username = self.active_client_connection.get("username", "Unknown")
-            message = f"Chat request from: {requester_ip}:{requester_username}"
+            message = f"Chat request from: {requester_ip}"
             client_conn.sendall(message.encode("utf-8"))
             self.logger.info("Notified client about incoming chat request.")
         else:
             self.logger.info("No client connected to handle chat request.")
             self.send_control_datagram(8, 0, requester_ip, 7777)  # FIN
+            with self.lock:
+                if (requester_ip, 7777) in self.handshake_status:
+                    del self.handshake_status[(requester_ip, 7777)]
+            self.active_chat.clear()
 
 
     def handle_incoming_command_from_client(self, client_conn, client_addr):
@@ -324,7 +331,12 @@ class Daemon:
                     self.handle_client_username(username, client_conn)
 
                 elif message_code == 0:
-                    # Quit
+                    if self.active_chat and self.active_chat.get("state") == "started":
+                        target_ip = self.active_chat["target_ip"]
+                        target_port = self.active_chat["target_port"]
+                        self.send_control_datagram(8, 0, target_ip, target_port)  # FIN
+                        self.active_chat.clear()
+
                     self.disconnect_client(client_conn)
                     break
 
@@ -444,7 +456,6 @@ class Daemon:
             self.active_client_connection["conn"].sendall(b"DECLINED - Handshake timed out, back to menu.")
 
 
-        # Revert to Idle state
         self.active_chat.clear()
         with self.lock:
             if (target_ip, target_port) in self.handshake_status:

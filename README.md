@@ -47,7 +47,7 @@ A lightweight chat protocol built on UDP with reliable messaging using stop-and-
     - The client that receives the chat request can accept or decline it.
     - If the chat request is accepted, the clients can start sending messages to each other.
     - If the chat request is declined, the clients can send chat requests to other clients.
-    - The clients can also disconnect from the chat at any time.
+    - The clients can also disconnect from the chat at any time. Write 'quit' to disconnect from the chat.
     - The server will keep track of all the active clients and their connections.
     - The server will also keep track of all the active chats and their connections.
 

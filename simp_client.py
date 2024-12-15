@@ -166,23 +166,20 @@ class Client:
                 else:
                     self.wait_for_message()
         except KeyboardInterrupt:
-            print("\nExiting chat...")
-            self.quit_chat()
+            self.daemon_tcp_socket.sendall("0".encode("utf-8"))
+            self.in_chat = False
 
 
     def wait_for_message(self):
-        '''
-        Wait for a message from the other user
-        '''
         print("Waiting for a reply...", flush=True)
         try:
             response = self.daemon_tcp_socket.recv(1024).decode("utf-8", errors="replace")
-            if response.startswith("Message from"):
+            if not response or response.startswith("CHAT_ENDED"):
+                print("Other user ended the chat. Returning to main menu.")
+                self.in_chat = False
+            elif response.startswith("Message from"):
                 print(response, flush=True)
                 self.is_sender = True
-            elif not response:
-                print("Chat ended.", flush=True)
-                self.in_chat = False
             else:
                 print(f"Unexpected response: {response}", flush=True)
         except Exception as e:
@@ -191,26 +188,15 @@ class Client:
 
 
     def send_message(self):
-        '''
-        Send a message to the other
-        '''
-        message = input("Enter your message: ").strip()
+        message = input("Enter your message (or 'quit' to end chat): ").strip()
         if message.lower() == "quit":
-            self.quit_chat()
+            self.daemon_tcp_socket.sendall("0".encode("utf-8"))
+            print("Exiting chat...")
+            self.in_chat = False
             return
         if message:
             self.daemon_tcp_socket.sendall(f"4 {message}".encode("utf-8"))
         self.is_sender = False
-
-
-    def quit_chat(self):
-        '''
-        Quit the chat session
-        '''
-        self.in_chat = False
-        self.daemon_tcp_socket.sendall("0".encode("utf-8"))
-        self.daemon_tcp_socket.close()
-        sys.exit(0)
 
 
     def quit(self):
