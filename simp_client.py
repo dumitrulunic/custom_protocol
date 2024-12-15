@@ -130,10 +130,9 @@ class Client:
         '''
         Handle incoming chat request
         '''
-        requester_info = response.split(".")[0]
-        requester_ip = requester_info.split(":")[1].strip()
+        requester_ip = response.split(":")[1].strip()
 
-        accept = input(f"Do you want to accept the chat request from {requester_ip}? (y/n): ").strip().lower()
+        accept = input(f"Do you want to accept the chat request from {requester_ip} ? (y/n): ").strip().lower()
         if accept == "y":
             self.daemon_tcp_socket.sendall("3 ACCEPT".encode("utf-8"))
             self.in_chat = True
