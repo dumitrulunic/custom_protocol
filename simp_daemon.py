@@ -17,6 +17,7 @@ class Daemon:
         self.active_client_connection = {} # {"conn": ..., "username": ..., "address": ...}
         self.active_chat = {} # {"target_ip": ..., "target_port": ..., "state": ...}
         
+        # track handshake status
         self.handshake_status = {}
 
         self.lock = threading.Lock()
@@ -26,6 +27,7 @@ class Daemon:
     def start(self):
         '''
         Start the daemon and listen for incoming packets from the daemon and client.
+        Used threading because, the dameon must listen for both it's client and other daemon/s, since any of them can start chat.
         '''
         self.logger.info(f'Daemon started on {self.ip_address}:{self.port}')
         daemon_thread = threading.Thread(target=self.listen_to_daemon_packets, daemon=True)
@@ -56,6 +58,9 @@ class Daemon:
 
 
     def listen_to_daemon_packets(self):
+        '''
+            Listen for other daemon, using custom SIMP UDP.
+        '''
         try:
             self.socket_daemon = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.socket_daemon.bind((self.ip_address, 7777))
@@ -100,7 +105,7 @@ class Daemon:
 
     def handle_incoming_datagram_from_daemon(self, data: bytes, address: tuple):
         '''
-        Handle incoming datagram from the daemon.
+        Handle incoming datagram from the daemon. Distinguish between control and chat datagram.
         '''
         try:
             logger.info(f"Active chat: {self.active_chat}")
@@ -120,7 +125,7 @@ class Daemon:
 
     def handle_control_datagram(self, datagram: Datagram, address: tuple):
         '''
-        Handle incoming control datagram from the daemon.
+        Handle incoming control datagram from the daemon. check its operation and proceed acordingly.
         '''
         logger.info(f"Active chat: {self.active_chat}")
         operation = datagram.operation[0]
@@ -131,53 +136,64 @@ class Daemon:
         if operation == 1:  # ERR
             self.logger.error(f"Error from {address}: {datagram.payload.decode('ascii')}")
 
+        # there is incomming chat request
         elif operation == 2:  # SYN 
             self.logger.info(f"Received SYN from {address}.")
+            # Check if we are already in a chat
             if self.is_already_in_chat():
+                # If in chat, cannot accept a new one, send ERR and FIN to close
                 self.send_control_datagram(1, 0, ip, port, "User already in another chat")
                 self.send_control_datagram(8, 0, ip, port)  # FIN
             else:
                 self.active_chat = {"target_ip": ip, "target_port": port, "state": "handshake_complete"}
+                # Now client must accept or decline
                 self.notify_client_chat_request(ip)
 
 
         elif operation == 4:  # ACK
             self.logger.info(f"Received ACK from {address}")
+            # Mark connection with this daemon as active
             self.mark_connection_as_active(address, sequence)
-
+            
+            # additional check if target ip and port are set
             if self.active_chat.get("target_ip") is None:
                 self.active_chat["target_ip"] = ip
                 self.active_chat["target_port"] = port
 
+            #If we were in 'handshake_complete' state and got ACK, that means handshake done
             if self.active_chat.get("state") == "handshake_complete":
                 self.active_chat["state"] = "started"
+                # Notify client that the chat starte
                 if "conn" in self.active_client_connection:
                     self.active_client_connection["conn"].sendall(b"SUCCESS - Chat started.")
-
+            #additional check and uppdate handshake_status if needed
             if (ip, port) in self.handshake_status and self.handshake_status[(ip, port)] == "SYN_ACK_RECEIVED":
                 self.handshake_status[(ip, port)] = "handshake_complete"
 
         elif operation == 6:  # SYN+ACK
             self.logger.info(f"Received SYN+ACK from {address}")
+            # If we sent SYN and now got SYN+ACK, we respond with ACK
             if (ip, port) in self.handshake_status and self.handshake_status[(ip, port)] == "SYN_SENT":
                 self.send_control_datagram(4, sequence, ip, port)  # ACK
                 self.handshake_status[(ip, port)] = "SYN_ACK_RECEIVED"
 
         elif operation == 8:  # FIN
             self.logger.info(f"Received FIN from {address}, sending ACK and closing.")
+             # Acknowledge the FIN
             self.send_control_datagram(4, sequence, ip, port)
             self.mark_connection_as_inactive(address)
 
+            # check FIN corresponds to our active chat, end the chat session
             if self.active_chat.get("target_ip") == ip and self.active_chat.get("target_port") == port:
                 if "conn" in self.active_client_connection:
                     self.active_client_connection["conn"].sendall(b"CHAT_ENDED")
 
+                # clean handhshake status
                 with self.lock:
                     if (ip, port) in self.handshake_status:
                         del self.handshake_status[(ip, port)]
-
+                # clean chat track dict
                 self.active_chat.clear()
-
 
 
         else:
@@ -186,6 +202,7 @@ class Daemon:
 
     def handle_chat_datagram(self, datagram: Datagram, address: tuple):
         logger.info(f"Active chat: {self.active_chat}")
+        # check if chat started to continue to process chat datagrams
         if not self.active_chat or self.active_chat["state"] != "started":
             self.logger.warning("No active chat session. Cannot process chat message.")
             return
@@ -194,15 +211,18 @@ class Daemon:
         message = datagram.payload.decode("utf-8")
         sequence = datagram.sequence[0]
 
+        # check packet sequence to tarck order of messages
         if sequence != self.expected_sequence:
             self.logger.warning(f"Unexpected sequence. Expected: {self.expected_sequence}, got: {sequence}")
             return
 
         with self.lock:
+            # reverse sequence for next expected package
             self.expected_sequence = (self.expected_sequence + 1) % 2
 
         self.logger.info(f"Received chat message from {sender}@{address}: {message}")
 
+        # forward messafe to client
         if "conn" in self.active_client_connection:
             client_conn = self.active_client_connection["conn"]
             try:
@@ -212,7 +232,7 @@ class Daemon:
                 self.disconnect_client(client_conn)
         else:
             self.logger.warning("No client connected, dropping message.")
-
+        #Send ACK back to the other daemon to confirm if it receivedthe  message
         self.send_control_datagram(4, sequence, address[0], address[1])
 
 
@@ -326,17 +346,19 @@ class Daemon:
                     continue
 
                 if message_code == 1:
-                    # Set username
+                    # Set username of client
                     username = args_str.strip()
                     self.handle_client_username(username, client_conn)
 
                 elif message_code == 0:
+                    # Client wants to end the chat or quit
                     if self.active_chat and self.active_chat.get("state") == "started":
                         target_ip = self.active_chat["target_ip"]
                         target_port = self.active_chat["target_port"]
                         self.send_control_datagram(8, 0, target_ip, target_port)  # FIN
                         self.active_chat.clear()
 
+                    # disconnect client
                     self.disconnect_client(client_conn)
                     break
 
@@ -352,6 +374,7 @@ class Daemon:
                     self.handle_client_chat_decision(decision, client_conn)
 
                 elif message_code == 4:
+                    # Client wants to send a message to the other , retransmit to other daemon
                     self.retransmit_message_to_other_daemon(args_str)
 
                 else:
@@ -385,9 +408,9 @@ class Daemon:
 
         if decision == "ACCEPT":
             self.logger.info("Client accepted the chat request.")
-            # Instead of sending ACK(4) right away, send SYN+ACK(6) to match the expected sequence
+            ## Send SYN+ACKto the initiator instead of ACK
             self.send_control_datagram(6, 0, requester_ip, requester_port)  # SYN+ACK
-            # Don't change state yet. Wait until we get an ACK(4) from the initiator before concluding handshake.
+             # Wait for final ACK before changing state to "started"
         else:
             self.logger.info("Client declined the chat request.")
             self.send_control_datagram(8, 0, requester_ip, requester_port)  # FIN
@@ -422,6 +445,7 @@ class Daemon:
         if is_initiator:
             success = self.handshake_initiator(target_ip, target_port)
             if success:
+                # Handshake succeeded, chat session started
                 self.logger.info("Handshake complete. Chat session started.")
                 if "conn" in self.active_client_connection:
                     self.active_client_connection["conn"].sendall(b"SUCCESS - Chat started.")
@@ -436,11 +460,12 @@ class Daemon:
         self.send_control_datagram(2, 0, target_ip, target_port)  # SYN
 
         start_time = time.time()
-        # Wait for SYN+ACK
+        # Wait up to 5 seconds for SYN+ACK
         while time.time() - start_time < timeout:
             with self.lock:
                 state = self.handshake_status.get((target_ip, target_port))
                 if state == "SYN_ACK_RECEIVED":
+                    # Got SYN+ACK, send ACK and mark handshake complete
                     self.send_control_datagram(4, 0, target_ip, target_port)
                     self.handshake_status[(target_ip, target_port)] = "HANDSHAKE_COMPLETE"
                     self.active_chat = {
@@ -449,8 +474,8 @@ class Daemon:
                         "state": "handshake_complete"
                     }
                     return True
-            time.sleep(0.1)
-
+            time.sleep(0.3)
+        # If we reached here, handshake timed out
         self.logger.warning("Handshake timed out.")
         if "conn" in self.active_client_connection:
             self.active_client_connection["conn"].sendall(b"DECLINED - Handshake timed out, back to menu.")
@@ -479,11 +504,13 @@ class Daemon:
         target_port = self.active_chat["target_port"]
 
         with self.lock:
+             # neext sequence number
             seq = self.expected_sequence
             self.expected_sequence = (self.expected_sequence + 1) % 2
 
         username = self.active_client_connection.get("username", "Unknown")
 
+        # make chat datagram to send to other daemon
         chat_datagram = Datagram(
             datagram_type=2,
             operation=1,

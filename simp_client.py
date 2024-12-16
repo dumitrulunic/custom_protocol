@@ -6,15 +6,24 @@ class Client:
     def __init__(self, daemon_ip: str, daemon_port=7778):
         self.daemon_ip = daemon_ip
         self.daemon_port = daemon_port
+        
+        # track client username
         self.username = None
+        
+        # track connection status
         self.connected = False
+        
+        # track chat status if in chat or not
         self.in_chat = False
+        
+        # flag used to determine if the client is the sender or receiver
         self.is_sender = False
+        
         self.daemon_tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     def connect_to_daemon(self):
         '''
-        Connect to the daemon server
+        Connect to the daemon server, using tcp
         '''
         try:
             self.daemon_tcp_socket.connect((self.daemon_ip, self.daemon_port))
@@ -27,7 +36,7 @@ class Client:
 
     def send_username(self):
         '''
-        Send the username to the daemon
+        Send the username to the daemon, using '1 <username>' format. Wait for response
         '''
         self.username = input("Enter your username: ").strip()
         if not self.username:
@@ -44,7 +53,7 @@ class Client:
 
     def menu(self):
         '''
-        Main menu for the client
+        Main menu for the client.
         '''
         while True:
             print("\nMain Menu:")
@@ -64,6 +73,9 @@ class Client:
 
     
     def start_chat(self):
+        '''
+        Start a chat with another user, wait response from daemon i nformat: 'DECLINED' | 'SUCCESS'
+        '''
         target_ip = input("Enter the IP address of the target daemon: ").strip()
         if not target_ip:
             print("Target IP cannot be empty.")
@@ -104,6 +116,9 @@ class Client:
                 
                 
     def wait_for_chat(self):
+        '''
+            Function to start a chat (send request to other user)
+        '''
         print("Waiting for an incoming chat request...")
         while True:
             response = self.daemon_tcp_socket.recv(1024).decode("utf-8")
@@ -128,7 +143,7 @@ class Client:
 
     def handle_incoming_chat_request(self, response):
         '''
-        Handle incoming chat request
+        Handle incoming chat request for other user. Can decline using "y" | 'n"
         '''
         requester_ip = response.split(":")[1].strip()
 
@@ -156,7 +171,7 @@ class Client:
 
     def chat_session(self):
         '''
-        Chat session between two users
+        Chat session between two users, is running inifinetelly, use ctr+c to stop it, daemons will disconnect automatically
         '''
         try:
             while self.in_chat:
@@ -171,6 +186,9 @@ class Client:
 
 
     def wait_for_message(self):
+        '''
+        Function to wait for a message from other user. If other user ends chat, will be notified.
+        '''
         print("Waiting for a reply...", flush=True)
         try:
             response = self.daemon_tcp_socket.recv(1024).decode("utf-8", errors="replace")
@@ -188,6 +206,9 @@ class Client:
 
 
     def send_message(self):
+        '''
+            Function to send a message, if you send "quit", you will exit the chat and other user will be notified.
+        '''
         message = input("Enter your message (or 'quit' to end chat): ").strip()
         if message.lower() == "quit":
             self.daemon_tcp_socket.sendall("0".encode("utf-8"))

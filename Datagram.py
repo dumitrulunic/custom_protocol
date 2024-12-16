@@ -1,8 +1,11 @@
 import struct
 from logger import logger
 
+# Used big endianess
+
 class Datagram:
     def __init__(self, datagram_type:bytes, operation:bytes, sequence:bytes, user:bytes, payload:bytes, length:bytes) -> None:
+        # can be bytes or regular data types(if yes convert to bytes)
         self.datagram_type = datagram_type if isinstance(datagram_type, bytes) else datagram_type.to_bytes(1, 'big')
         self.operation = operation if isinstance(operation, bytes) else operation.to_bytes(1, 'big')
         self.sequence = sequence if isinstance(sequence, bytes) else sequence.to_bytes(1, 'big')
@@ -32,7 +35,9 @@ class Datagram:
 
         
     def check_datagram(self):
-        
+        '''
+        check validity of th datagram.
+        '''
         if self.datagram_type not in (b'\x01', b'\x02'):
             logger.error(f"Invalid type: {self.datagram_type}")
             return False
@@ -64,8 +69,10 @@ class Datagram:
         return True
 
 
-    def to_bytes(self):
-        # Convert the datagram to bytes for transmission
+    def to_bytes(self):    
+        '''
+            convert to bytes
+        '''
         user_fixed = self.user.ljust(32, b'\x00')[:32]
         header = struct.pack(
             "!BBB32sI",
@@ -80,6 +87,9 @@ class Datagram:
 
     @classmethod
     def from_bytes(cls, data: bytes):
+        '''
+            convert from bytes
+        '''
         if len(data) < 38:
             raise ValueError("Datagram is too short")
         
