@@ -141,12 +141,14 @@ class Daemon:
             self.logger.info(f"Received SYN from {address}.")
             # Check if we are already in a chat
             if self.is_already_in_chat():
-                # If in chat, cannot accept a new one, send ERR and FIN to close
                 self.send_control_datagram(1, 0, ip, port, "User already in another chat")
                 self.send_control_datagram(8, 0, ip, port)  # FIN
             else:
-                self.active_chat = {"target_ip": ip, "target_port": port, "state": "handshake_complete"}
-                # Now client must accept or decline
+                self.send_control_datagram(6, 0, ip, port)  # SYN+ACK
+                self.handshake_status[(ip, port)] = "SYN_ACK_SENT"
+
+                self.active_chat = {"target_ip": ip, "target_port": port,
+                                    "state": "pending_user_acceptance"}
                 self.notify_client_chat_request(ip)
 
 
@@ -203,13 +205,21 @@ class Daemon:
     def handle_chat_datagram(self, datagram: Datagram, address: tuple):
         logger.info(f"Active chat: {self.active_chat}")
         # check if chat started to continue to process chat datagrams
-        if not self.active_chat or self.active_chat["state"] != "started":
-            self.logger.warning("No active chat session. Cannot process chat message.")
-            return
+        if self.active_chat.get("state") == "waiting_for_first_message":
+            self.logger.info("Received first chat from remote => remote user accepted!")
+            self.active_chat["state"] = "started"
+            # Let local client know that the chat is truly started
+            if "conn" in self.active_client_connection:
+                self.active_client_connection["conn"].sendall(b"SUCCESS - Chat started.\n")
+
 
         sender = datagram.user.decode("utf-8").strip()
         message = datagram.payload.decode("utf-8")
         sequence = datagram.sequence[0]
+        
+        # skip acceptance message
+        if message.endswith(" accepted."):
+            self.logger.info("Skipping display of acceptance message.")
 
         # check packet sequence to tarck order of messages
         if sequence != self.expected_sequence:
@@ -399,8 +409,10 @@ class Daemon:
 
     def handle_client_chat_decision(self, decision, client_conn):
         logger.info(f"Active chat: {self.active_chat}")
-        if not self.active_chat or self.active_chat.get("state") != "handshake_complete":
+        
+        if not self.active_chat or self.active_chat.get("state") != "pending_user_acceptance":
             self.logger.warning("No pending chat request.")
+            client_conn.sendall(b"No pending chat request.\n")
             return
 
         requester_ip = self.active_chat["target_ip"]
@@ -408,18 +420,24 @@ class Daemon:
 
         if decision == "ACCEPT":
             self.logger.info("Client accepted the chat request.")
-            ## Send SYN+ACKto the initiator instead of ACK
-            self.send_control_datagram(6, 0, requester_ip, requester_port)  # SYN+ACK
-             # Wait for final ACK before changing state to "started"
+            self.active_chat["state"] = "started"
+            client_conn.sendall(b"SUCCESS - Chat started.\n")
+            
+            # send fake chat message to trigger chat start
+            acceptance_message = f"{self.active_client_connection.get('username', '???')} accepted."
+            self.retransmit_message_to_other_daemon(acceptance_message)
+
         else:
             self.logger.info("Client declined the chat request.")
             self.send_control_datagram(8, 0, requester_ip, requester_port)  # FIN
-            client_conn.sendall(b"DECLINED - Back to menu.")
+            
+            client_conn.sendall(b"DECLINED - Back to menu.\n")
+            
             self.active_chat.clear()
-
             with self.lock:
                 if (requester_ip, requester_port) in self.handshake_status:
                     del self.handshake_status[(requester_ip, requester_port)]
+
 
 
     def disconnect_client(self, client_conn):
@@ -446,10 +464,12 @@ class Daemon:
             success = self.handshake_initiator(target_ip, target_port)
             if success:
                 # Handshake succeeded, chat session started
-                self.logger.info("Handshake complete. Chat session started.")
+                self.logger.info("Handshake complete, now waiting for remote acceptance.")
                 if "conn" in self.active_client_connection:
-                    self.active_client_connection["conn"].sendall(b"SUCCESS - Chat started.")
-                self.active_chat["state"] = "started"
+                    self.active_client_connection["conn"].sendall(
+                        b"Transport handshake OK. Waiting for remote user to accept...\n"
+                    )
+                self.active_chat["state"] = "waiting_for_first_message"
             else:
                 self.logger.info("Handshake failed or timed out.")
 
@@ -498,6 +518,11 @@ class Daemon:
         logger.info(f"Active chat: {self.active_chat}")
         if not self.active_chat or self.active_chat["state"] != "started":
             self.logger.warning("No active chat session. Cannot send message.")
+            # optionally also tell the local client:
+            if "conn" in self.active_client_connection:
+                self.active_client_connection["conn"].sendall(
+                    b"Cannot send message: remote user has not accepted.\n"
+                )
             return
 
         target_ip = self.active_chat["target_ip"]
@@ -527,7 +552,7 @@ class Daemon:
         if "conn" in self.active_client_connection and self.active_client_connection.get("username"):
             client_conn = self.active_client_connection["conn"]
             requester_username = self.active_client_connection.get("username", "Unknown")
-            message = f"Chat request from: {requester_ip}"
+            message = f"Chat request from: {requester_ip}, {requester_username}"
             client_conn.sendall(message.encode("utf-8"))
             self.logger.info("Notified client about incoming chat request.")
         else:

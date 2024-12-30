@@ -92,7 +92,7 @@ class Client:
             elif response.startswith("SUCCESS"):
                 print("Chat started successfully!")
                 self.in_chat = True
-                self.is_sender = True
+                # self.is_sender = True
                 self.chat_session()
                 break
 
@@ -217,6 +217,7 @@ class Client:
             return
         if message:
             self.daemon_tcp_socket.sendall(f"4 {message}".encode("utf-8"))
+            self.is_sender = False
         self.is_sender = False
 
 
