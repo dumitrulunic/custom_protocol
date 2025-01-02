@@ -9,6 +9,27 @@ A lightweight chat protocol built on UDP with reliable messaging using stop-and-
 - [Andrei-Flavius Văcaru](https://github.com/VakaruGIT)
 - [Dumitru Lunic](https://github.com/dumitrulunic)
 
+#### Handling Sequence Numbers
+
+- We use sequence numbers to ensure the correct order of messages. Each datagram includes a sequence number, which alternates between 0 and 1. This allows us to detect and handle duplicate or out-of-order messages.
+
+#### Handling Retransmissions
+
+- Our protocol uses a stop-and-wait mechanism for reliable messaging. After sending a datagram, the sender waits for an acknowledgment (ACK) from the receiver before sending the next datagram. If an ACK is not received within a certain timeout period, the sender retransmits the datagram.
+
+#### Code Organization
+
+- `Datagram.py`: Defines the `Datagram` class, which represents the structure of a datagram and includes methods for serialization and deserialization based on the project requirements.
+- `logger.py`: Configures the logging for the project.
+- `run_client.py`: Entry point for running the client.
+- `run_daemon.py`: Entry point for running the daemon.
+- `simp_client.py`: Defines the `Client` class, which handles client-side operations(chat menu, sending ).
+- `simp_daemon.py`: Defines the `Daemon` class, which handles daemon-side operations.
+
+### Testing
+
+- We have included tests in the `tests/` directory to verify the functionality of the client, daemon, and datagram. You can run these tests to ensure that everything is working correctly.
+
 ### Running the Project
 
 1. Dependencies:
@@ -33,8 +54,9 @@ A lightweight chat protocol built on UDP with reliable messaging using stop-and-
        sudo ifconfig lo0 alias 127.0.0.2
        `
 
-> Note: If ports are not available, check if the ports 7777 and 7778 are busy with:
-> `lsof -i :7777` and `lsof -i :7778`
+> Note: If ports are not available, check if the ports 7777 and 7778 are busy with: 
+
+>`lsof -i :7777` and `lsof -i :7778` 
 
 4. Running the clients:
 
@@ -56,27 +78,6 @@ A lightweight chat protocol built on UDP with reliable messaging using stop-and-
    - The clients can also disconnect from the chat at any time. Write 'quit' to disconnect from the chat.
    - The server will keep track of all the active clients and their connections.
    - The server will also keep track of all the active chats and their connections.
-
-#### Handling Sequence Numbers
-
-We use sequence numbers to ensure the correct order of messages. Each datagram includes a sequence number, which alternates between 0 and 1. This allows us to detect and handle duplicate or out-of-order messages.
-
-#### Handling Retransmissions
-
-Our protocol uses a stop-and-wait mechanism for reliable messaging. After sending a datagram, the sender waits for an acknowledgment (ACK) from the receiver before sending the next datagram. If an ACK is not received within a certain timeout period, the sender retransmits the datagram.
-
-#### Code Organization
-
-- `Datagram.py`: Defines the `Datagram` class, which represents the structure of a datagram and includes methods for serialization and deserialization based on the project requirements.
-- `logger.py`: Configures the logging for the project.
-- `run_client.py`: Entry point for running the client.
-- `run_daemon.py`: Entry point for running the daemon.
-- `simp_client.py`: Defines the `Client` class, which handles client-side operations(chat menu, sending ).
-- `simp_daemon.py`: Defines the `Daemon` class, which handles daemon-side operations.
-
-### Testing
-
-We have included tests in the `tests/` directory to verify the functionality of the client, daemon, and datagram. You can run these tests to ensure that everything is working correctly.
 
 6. To stop the daemons, we can press `Ctrl+C` in the terminal where the daemon is running.
 
